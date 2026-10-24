@@ -59,7 +59,8 @@ small {color:var(--muted);}
 </section>
 <section id="chordPage" hidden>
 <h2>Chord Intonation Trainer</h2>
-<label>Chord: <select id="chordPreset"></select></label><br>
+<label>Chord: <select id="chordPreset" onchange="updateInversionOptions()"></select></label><br>
+<label>Inversion: <select id="chordInversion"><option value="0">Root position</option></select></label><br>
 
 <label>Cents off: <input id="chordCents" type="number" value="20" min="0" step="any" style="width:85px"></label><br>
 <label>Tonic: <select id="chordRootMode"><option value="fixed">Fixed C4</option><option value="random">Random each question</option></select></label><br>
@@ -71,7 +72,7 @@ small {color:var(--muted);}
 <div id="chordDirectionBlock"><h3>In which direction?</h3><div class="choices"><button id="chordFlat" onclick="answerChordDirection('flat')">Flat</button><button id="chordSharp" onclick="answerChordDirection('sharp')">Sharp</button></div></div>
 <h2 id="chordResult" aria-live="polite"></h2>
 <p id="chordStats"></p><button onclick="resetStats('chord')">Reset chord statistics</button><div id="chordReplayButtons" hidden><strong>Given chord:</strong> <button onclick="playChordGiven('horizontal')">Horizontal</button><button onclick="playChordGiven('vertical')">Vertical</button><br><strong>Correct chord:</strong> <button onclick="playChordCorrect('horizontal')">Horizontal</button><button onclick="playChordCorrect('vertical')">Vertical</button></div>
-<p><small>Horizontal plays the voices low to high; vertical plays them together. Both replay the same question. After answering, compare the given and corrected chords in either style.</small></p>
+<p><small>Inversions move lower chord tones up an octave; voice buttons are shown low to high. Horizontal plays the voices low to high; vertical plays them together. Both replay the same question. After answering, compare the given and corrected chords in either style.</small></p>
 </section>
 <script>
 const AudioContextClass = window.AudioContext || window.webkitAudioContext;
@@ -248,24 +249,39 @@ const chordGroups = [
   ['Ninth chords', [['majorAdd9','Major add9'],['minorAdd9','Minor add9'],['dominant9','Dominant 9'],['major9','Major 9'],['minor9','Minor 9']]]
 ];
 function chordNoteName(n){return names[n%12]+(n>=12?' (upper octave)':'');}
+function updateInversionOptions(){
+ const count=chordPresets[$('chordPreset').value].length;
+ const previous=$('chordInversion').value;
+ const ord=['Root position','1st inversion','2nd inversion','3rd inversion','4th inversion'];
+ $('chordInversion').innerHTML=Array.from({length:count},(_,i)=>`<option value="${i}">${ord[i]}</option>`).join('')+'<option value="random">Random inversion</option>';
+ $('chordInversion').value=previous==='random'||Number(previous)<count?previous:'0';
+}
+function invertChord(notes,inversion){
+ return notes.map((n,i)=>({pitch:n+(i<inversion?12:0),factor:i})).sort((a,b)=>a.pitch-b.pitch);
+}
 let chordQuestion=null, chordVoice=null, chordDirection=null, chordAnswered=false;
 function initChordTrainer(){
   $('chordPreset').innerHTML=chordGroups.map(([group,items])=>`<optgroup label="${group}">${items.map(([key,label])=>`<option value="${key}">${label}</option>`).join('')}</optgroup>`).join('');
+  updateInversionOptions();
 }
 function chordFrequency(note,cents=0){
   const ratio=chordQuestion.tuning==='equal'?Math.pow(2,note/12):tuningRatios[chordQuestion.tuning][note%12]*Math.pow(2,Math.floor(note/12));
   return chordQuestion.root*ratio*Math.pow(2,cents/1200);
 }
 function newChordQuestion(){
-  const notes=[...chordPresets[$('chordPreset').value]];
+  const baseNotes=[...chordPresets[$('chordPreset').value]];
+  const choice=$('chordInversion').value;
+  const inversion=choice==='random'?Math.floor(Math.random()*baseNotes.length):Number(choice);
+  const voices=invertChord(baseNotes,inversion);
+  const notes=voices.map(v=>v.pitch);
   const amount=Math.abs(Number($('chordCents').value)||0);
   const outcome=Math.floor(Math.random()*(notes.length*2+1));
   const wrongVoice=amount===0||outcome===notes.length*2?-1:Math.floor(outcome/2);
   const cents=wrongVoice===-1?0:(outcome%2===0?-amount:amount);
-  chordQuestion={notes,wrongVoice,cents,tuning:$('chordTuning').value,root:chooseRoot($('chordRootMode').value)};
+  chordQuestion={notes,voices,inversion,wrongVoice,cents,tuning:$('chordTuning').value,root:chooseRoot($('chordRootMode').value)};
   chordVoice=null; chordDirection=null; chordAnswered=false;
   $('chordResult').textContent=''; $('chordReplayButtons').hidden=true;
-  $('chordVoiceButtons').innerHTML=notes.map((n,i)=>`<button id="chordVoice${i}" onclick="answerChordVoice(${i})">${chordNoteName(n)}</button>`).join('');
+  $('chordVoiceButtons').innerHTML=notes.map((n,i)=>`<button id="chordVoice${i}" onclick="answerChordVoice(${i})">${chordNoteName(baseNotes[voices[i].factor])}${voices[i].factor===0?' (root)':''}</button>`).join('');
   $('allCorrect').classList.remove('selected');
   $('chordFlat').classList.remove('selected');$('chordSharp').classList.remove('selected');
   $('chordDirectionBlock').hidden=false;
@@ -305,7 +321,7 @@ function checkChordAnswer(){
   if(chordVoice===null||(chordVoice!==-1&&chordDirection===null)||chordAnswered)return;
   chordAnswered=true;
   const correct=chordVoice===chordQuestion.wrongVoice && (chordVoice===-1||chordDirection===(chordQuestion.cents<0?'flat':'sharp'));
-  const answer=chordQuestion.wrongVoice===-1?'All are correct':`${chordNoteName(chordQuestion.notes[chordQuestion.wrongVoice])} is ${chordQuestion.cents<0?'flat':'sharp'}`;
+  const answer=chordQuestion.wrongVoice===-1?'All are correct':`${chordNoteName(chordPresets[$('chordPreset').value][chordQuestion.voices[chordQuestion.wrongVoice].factor])} (voice ${chordQuestion.wrongVoice+1}, low to high) is ${chordQuestion.cents<0?'flat':'sharp'}`;
   $('chordResult').textContent=correct?'✅ Correct!':`❌ Correct answer: ${answer}`;
   $('chordReplayButtons').hidden=false;
   recordStat('chord',correct,chordQuestion.cents,{voice:chordVoice===chordQuestion.wrongVoice,direction:chordVoice===-1 ? chordQuestion.wrongVoice===-1 : chordQuestion.wrongVoice!==-1 && chordDirection===(chordQuestion.cents<0?'flat':'sharp')});
