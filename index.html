@@ -26,13 +26,26 @@ nav button[aria-current="page"] {font-weight: bold; text-decoration: underline;}
 .checks input {width: 18px; height: 18px; margin: 0;}
 #result {min-height: 1.5em;}
 small {color:var(--muted);}
+.settings-toggle {margin: 6px 0 12px; min-width:44px; min-height:44px; font-size:22px; line-height:1; vertical-align:middle;}
+.stats-summary {white-space:pre-line;}
+.options-panel {border:1px solid var(--border);border-radius:6px;padding:10px 12px;margin-bottom:12px;background:#1c222a;}
+.options-panel label {display:inline-block;margin:3px 0;}
+.stats-table-wrap {overflow-x:auto;max-width:100%;margin:12px 0;}
+.stats-table {border-collapse:collapse;width:100%;font-size:0.9rem;white-space:nowrap;}
+.stats-table th,.stats-table td {border-bottom:1px solid var(--border);padding:7px 9px;text-align:left;}
+.stats-table th {color:var(--muted);}
+.stats-table td:not(:first-child),.stats-table th:not(:first-child) {text-align:right;}
+@media(max-width:600px){body{margin:12px auto;padding:0 10px;}button,input,select{max-width:100%;}h1{font-size:1.5rem;}h2{font-size:1.25rem;}}
 </style>
 </head>
 <body>
 <h1>Interval Intonation Trainer</h1>
+<p id="soundOptions"><label>Sound: <select id="soundWave" onchange="saveSoundPreference()"><option value="triangle">Triangle (default)</option><option value="sine">Sine</option><option value="square">Square</option><option value="sawtooth">Sawtooth</option></select></label></p>
 <nav><button id="trainTab" aria-current="page" onclick="showPage('train')">Interval Trainer</button><button id="chordTab" onclick="showPage('chord')">Chord Trainer</button></nav>
 <section id="trainPage">
 <h2>Interval Trainer</h2>
+<button class="settings-toggle" id="intervalOptionsToggle" aria-expanded="true" aria-controls="intervalOptions" onclick="toggleOptions('interval')" title="Hide interval options" aria-label="Hide interval options">⚙</button>
+<div id="intervalOptions" class="options-panel">
 <p><button onclick="showPage('settings')">Choose Intervals / Presets</button> <small id="intervalSummary">Major scale · 7 intervals</small></p>
 <label>Cents off: <input id="centsOff" type="number" value="20" min="0" step="any" style="width: 85px"></label>
 <br>
@@ -41,13 +54,18 @@ small {color:var(--muted);}
 <label>Tonic: <select id="intervalRootMode"><option value="fixed">Fixed C4</option><option value="random">Random each question</option></select></label>
 <br>
 <label>Interval type: <select id="intervalType"><option value="ascending">Ascending</option><option value="descending">Descending</option><option value="harmonic">Harmonic</option></select></label>
-<p><button onclick="newQuestion()">New Question</button><button id="playButton" onclick="playQuestion()">Play</button></p>
+</div>
+<p><button onclick="newQuestion()">New Question</button><button onclick="playQuestion('harmonic')">Replay Harmonic</button><button onclick="playQuestion('separate')">Replay Separate</button></p>
 <h3>What note did you hear?</h3>
 <div id="noteButtons" class="choices"></div>
 <h3>Was it...</h3>
 <div class="choices"><button id="flat" onclick="answerTune('flat')">Flat</button><button id="in" onclick="answerTune('in')">In Tune</button><button id="sharp" onclick="answerTune('sharp')">Sharp</button></div>
 <h2 id="result" aria-live="polite"></h2>
-<p id="intervalStats"></p><button onclick="resetStats('interval')">Reset interval statistics</button><div id="replayButtons" hidden><button onclick="playGiven()">Play Given Interval</button><button onclick="playCorrect()">Play Correct Interval</button></div>
+<div id="replayButtons" hidden><p><strong>Given:</strong> <button onclick="playGiven('harmonic')">Harmonic</button><button onclick="playGiven('separate')">Separate</button></p><p><strong>Correct:</strong> <button onclick="playCorrect('harmonic')">Harmonic</button><button onclick="playCorrect('separate')">Separate</button></p></div>
+<p id="intervalStats" class="stats-summary"></p>
+<details id="intervalDetailStats"><summary>Accuracy by interval</summary><div class="stats-table-wrap"><table class="stats-table"><thead><tr><th>Interval</th><th>Recognition</th><th>Direction</th><th>Both</th></tr></thead><tbody id="intervalStatsRows"></tbody></table></div><small>Grouped by the correct interval, including wrong answers. Data begins with v2.0; previous totals are retained above.</small></details>
+<button onclick="resetStats('interval')">Reset interval statistics</button>
+
 </section>
 <section id="settingsPage" hidden>
 <h2>Interval Trainer — Choose Intervals</h2>
@@ -59,19 +77,23 @@ small {color:var(--muted);}
 </section>
 <section id="chordPage" hidden>
 <h2>Chord Intonation Trainer</h2>
+<button class="settings-toggle" id="chordOptionsToggle" aria-expanded="true" aria-controls="chordOptions" onclick="toggleOptions('chord')" title="Hide chord options" aria-label="Hide chord options">⚙</button>
+<div id="chordOptions" class="options-panel">
 <label>Chord: <select id="chordPreset" onchange="updateInversionOptions()"></select></label><br>
 <label>Inversion: <select id="chordInversion"><option value="0">Root position</option></select></label><br>
 
 <label>Cents off: <input id="chordCents" type="number" value="20" min="0" step="any" style="width:85px"></label><br>
 <label>Tonic: <select id="chordRootMode"><option value="fixed">Fixed C4</option><option value="random">Random each question</option></select></label><br>
 <label>Tuning system: <select id="chordTuning"><option value="equal">Equal temperament (12-TET)</option><option value="just">Just intonation (5-limit)</option><option value="pythagorean">Pythagorean</option></select></label>
+</div>
 <p><button onclick="newChordQuestion()">New Question</button><button onclick="playChordQuestion('horizontal')">Replay Horizontal</button><button onclick="playChordQuestion('vertical')">Replay Vertical</button></p>
 <h3>Which voice is out of tune?</h3>
 <div id="chordVoiceButtons" class="choices"></div>
 <p><button id="allCorrect" onclick="answerChordVoice(-1)">All are correct</button></p>
 <div id="chordDirectionBlock"><h3>In which direction?</h3><div class="choices"><button id="chordFlat" onclick="answerChordDirection('flat')">Flat</button><button id="chordSharp" onclick="answerChordDirection('sharp')">Sharp</button></div></div>
 <h2 id="chordResult" aria-live="polite"></h2>
-<p id="chordStats"></p><button onclick="resetStats('chord')">Reset chord statistics</button><div id="chordReplayButtons" hidden><strong>Given chord:</strong> <button onclick="playChordGiven('horizontal')">Horizontal</button><button onclick="playChordGiven('vertical')">Vertical</button><br><strong>Correct chord:</strong> <button onclick="playChordCorrect('horizontal')">Horizontal</button><button onclick="playChordCorrect('vertical')">Vertical</button></div>
+<div id="chordReplayButtons" hidden><strong>Given chord:</strong> <button onclick="playChordGiven('horizontal')">Horizontal</button><button onclick="playChordGiven('vertical')">Vertical</button><br><strong>Correct chord:</strong> <button onclick="playChordCorrect('horizontal')">Horizontal</button><button onclick="playChordCorrect('vertical')">Vertical</button></div>
+<p id="chordStats" class="stats-summary"></p><button onclick="resetStats('chord')">Reset chord statistics</button>
 <p><small>Inversions move lower chord tones up an octave; voice buttons are shown low to high. Horizontal plays the voices low to high; vertical plays them together. Both replay the same question. After answering, compare the given and corrected chords in either style.</small></p>
 </section>
 <script>
@@ -101,10 +123,15 @@ let stats;
 try { stats=JSON.parse(localStorage.getItem(statsKey)) || {}; } catch(e) { stats={}; }
 for (const k of ['interval','chord']) if(!stats[k]) stats[k]={total:0,correct:0,byCents:{}};
 function saveStats(){try{localStorage.setItem(statsKey,JSON.stringify(stats));}catch(e){} renderStats();}
-function recordStat(kind,ok,cents,parts={}){
+function recordStat(kind,ok,cents,parts={},intervalNote=null){
  const st=stats[kind],key=String(Math.abs(cents)); st.total++;if(ok)st.correct++;
  if(!st.byCents[key])st.byCents[key]={total:0,correct:0};
  st.byCents[key].total++;if(ok)st.byCents[key].correct++;
+ if(kind==='interval' && Number.isInteger(intervalNote)){
+  if(!st.byInterval)st.byInterval={};
+  const item=st.byInterval[intervalNote]||(st.byInterval[intervalNote]={total:0,note:0,direction:0,both:0});
+  item.total++; if(parts.note)item.note++; if(parts.direction)item.direction++; if(ok)item.both++;
+ }
  // Independent scores begin with this version; earlier combined results remain intact.
  for(const [name,success] of Object.entries(parts)){
   if(!st[name])st[name]={total:0,correct:0,byCents:{}};
@@ -124,15 +151,34 @@ function renderStats(){
   const st=stats[kind],pct=st.total?Math.round(100*st.correct/st.total):0;
   const breakdown=Object.entries(st.byCents).sort((a,b)=>Number(b[0])-Number(a[0])).map(([c,v])=>`${c}¢: ${v.correct}/${v.total}`).join(' · ');
   const components=kind==='interval'?[['Interval recognition',st.note],['Tuning direction',st.direction]]:[['Wrong voice',st.voice],['Tuning direction',st.direction]];
-  const componentLines=components.map(([label,v])=>scoreText(label,v)).join(' | ');
+  const componentLines=components.map(([label,v])=>scoreText(label,v)).join('\n');
   const direction=st.direction;
   const directionBreakdown=direction?Object.entries(direction.byCents).sort((a,b)=>Number(b[0])-Number(a[0])).map(([c,v])=>`${c}¢: ${v.correct}/${v.total}`).join(' · '):'';
-  $(kind==='interval'?'intervalStats':'chordStats').textContent=`Complete answer: ${st.correct}/${st.total} (${pct}%) | ${componentLines}`+(breakdown?' | Complete by offset: '+breakdown:'')+(directionBreakdown?' | Direction by offset: '+directionBreakdown:'');
+  $(kind==='interval'?'intervalStats':'chordStats').textContent=`Complete answer: ${st.correct}/${st.total} (${pct}%)\n${componentLines}`+(breakdown?'\nComplete by offset: '+breakdown:'')+(directionBreakdown?'\nDirection by offset: '+directionBreakdown:'');
+  if(kind==='interval'){
+   const entries=Object.entries(st.byInterval||{}).sort((a,b)=>Number(a[0])-Number(b[0]));
+   const fmt=(n,total)=>`${n}/${total} (${Math.round(100*n/total)}%)`;
+   $('intervalStatsRows').innerHTML=entries.length?entries.map(([n,v])=>`<tr><td>${names[Number(n)]}</td><td>${fmt(v.note,v.total)}</td><td>${fmt(v.direction,v.total)}</td><td>${fmt(v.both,v.total)}</td></tr>`).join(''):'<tr><td colspan="4">No per-interval results yet. Answer a question to begin.</td></tr>';
+  }
  }
 }
 function resetStats(kind){if(!confirm('Reset '+kind+' statistics?'))return;stats[kind]={total:0,correct:0,byCents:{}};saveStats();}
 
 const $ = id => document.getElementById(id);
+function toggleOptions(kind){
+ const panel=$(kind+'Options'),toggle=$(kind+'OptionsToggle');
+ panel.hidden=!panel.hidden;
+ toggle.setAttribute('aria-label',(panel.hidden?'Show ':'Hide ')+kind+' options');
+ toggle.title=(panel.hidden?'Show ':'Hide ')+kind+' options';
+ toggle.setAttribute('aria-expanded',String(!panel.hidden));
+ try{localStorage.setItem('intonationOptionsCollapsed_'+kind, panel.hidden?'1':'0');}catch(e){}
+}
+function restoreOptions(){
+ for(const kind of ['interval','chord']){
+  try{if(localStorage.getItem('intonationOptionsCollapsed_'+kind)==='1')toggleOptions(kind);}catch(e){}
+ }
+}
+
 function showPage(page) {
   $('trainPage').hidden = page !== 'train';
   $('settingsPage').hidden = page !== 'settings';
@@ -170,30 +216,43 @@ function frequency(note, cents=0) {
   const ratio = questionTuning === 'equal' ? Math.pow(2,note/12) : tuningRatios[questionTuning][note];
   return intervalRoot * ratio * Math.pow(2,cents/1200);
 }
-function playTone(freq, at, duration=0.9) {
-  const osc=ctx.createOscillator(), gain=ctx.createGain();
-  osc.type='sine'; osc.frequency.setValueAtTime(freq,at);
-  osc.connect(gain); gain.connect(ctx.destination);
-  gain.gain.setValueAtTime(0.0001,at);
-  gain.gain.linearRampToValueAtTime(0.18,at+0.015);
-  gain.gain.setValueAtTime(0.18,at+duration-0.05);
-  gain.gain.linearRampToValueAtTime(0.0001,at+duration);
-  osc.start(at); osc.stop(at+duration+0.01);
-  return osc;
+const soundKey='intervalIntonationTrainerWaveformV19';
+const allowedWaves=['triangle','sine','square','sawtooth'];
+function saveSoundPreference(){try{localStorage.setItem(soundKey,$('soundWave').value);}catch(e){}}
+try {const saved=localStorage.getItem(soundKey);if(allowedWaves.includes(saved))$('soundWave').value=saved;}catch(e){}
+let activeVoices=[];
+function stopPlayback(){
+  if(!ctx)return;
+  const now=ctx.currentTime;
+  activeVoices.forEach(({osc,gain})=>{
+    try {gain.gain.cancelScheduledValues(now);gain.gain.setTargetAtTime(0.00001,now,0.012);osc.stop(now+0.075);}catch(e){}
+  });
+  activeVoices=[];
 }
-let activeOscillators=[];
-function playInterval(cents) {
+function playTone(freq,at,duration=0.9,volume=0.14){
+  const osc=ctx.createOscillator(),gain=ctx.createGain();
+  osc.type=$('soundWave').value;
+  osc.frequency.setValueAtTime(freq,at);
+  osc.connect(gain);gain.connect(ctx.destination);
+  const attack=0.035,release=0.12;
+  gain.gain.setValueAtTime(0.00001,at);
+  gain.gain.linearRampToValueAtTime(volume,at+attack);
+  gain.gain.setValueAtTime(volume,at+Math.max(attack,duration-release));
+  gain.gain.linearRampToValueAtTime(0.00001,at+duration);
+  osc.start(at);osc.stop(at+duration+0.025);
+  activeVoices.push({osc,gain});
+}
+function playInterval(cents,mode=questionType) {
   if(correctNote===null) return;
   audio(); playbackGeneration++;
-  activeOscillators.forEach(o=>{try{o.stop();}catch(e){}});
-  activeOscillators=[];
+  stopPlayback();
   const t=ctx.currentTime+0.02, target=frequency(correctNote,cents);
-  if(questionType==='harmonic') {
-    activeOscillators.push(playTone(intervalRoot,t),playTone(target,t));
-  } else if(questionType==='ascending') {
-    activeOscillators.push(playTone(intervalRoot,t),playTone(target,t+1.2));
+  if(mode==='harmonic') {
+    playTone(intervalRoot,t,0.9,0.095);playTone(target,t,0.9,0.095);
+  } else if(mode==='ascending' || (mode==='separate' && questionType!=='descending')) {
+    playTone(intervalRoot,t);playTone(target,t+1.2);
   } else {
-    activeOscillators.push(playTone(target,t),playTone(intervalRoot,t+1.2));
+    playTone(target,t);playTone(intervalRoot,t+1.2);
   }
 }
 function newQuestion() {
@@ -208,10 +267,9 @@ function newQuestion() {
   userNote=null; userTune=null; answered=false;
   $('result').textContent=''; $('replayButtons').hidden=true;
   document.querySelectorAll('.selected').forEach(b=>b.classList.remove('selected'));
-  $('playButton').textContent='Replay';
   playQuestion();
 }
-function playQuestion() {if(correctNote===null) {newQuestion();return;} playInterval(givenCents);}
+function playQuestion(mode=null) {if(correctNote===null) {newQuestion();return;} playInterval(givenCents,mode||questionType);}
 function answerNote(n) {
   if(correctNote===null || answered) return;
   userNote=n;
@@ -230,10 +288,10 @@ function check() {
   const label=correctTune==='in'?'in tune':correctTune;
   $('result').textContent = userNote===correctNote && userTune===correctTune ? '✅ Correct!' : `❌ Correct answer: ${names[correctNote]}, ${label}`;
   $('replayButtons').hidden=false;
-  recordStat('interval',userNote===correctNote && userTune===correctTune,givenCents,{note:userNote===correctNote,direction:userTune===correctTune});
+  recordStat('interval',userNote===correctNote && userTune===correctTune,givenCents,{note:userNote===correctNote,direction:userTune===correctTune},correctNote);
 }
-function playGiven() {playInterval(givenCents);}
-function playCorrect() {playInterval(0);}
+function playGiven(mode) {playInterval(givenCents,mode);}
+function playCorrect(mode) {playInterval(0,mode);}
 buildControls();
 
 const chordPresets = {
@@ -290,12 +348,12 @@ function newChordQuestion(){
 function playChord(correction, mode='horizontal'){
   if(!chordQuestion)return;
   audio();
-  activeOscillators.forEach(o=>{try{o.stop();}catch(e){}});activeOscillators=[];
+  stopPlayback();
   const t=ctx.currentTime+0.03;
   chordQuestion.notes.forEach((note,i)=>{
     const cents=correction?0:(i===chordQuestion.wrongVoice?chordQuestion.cents:0);
     const start=mode==='horizontal'?t+i*0.85:t;
-    activeOscillators.push(playTone(chordFrequency(note,cents),start,mode==='horizontal'?0.7:1.6));
+    playTone(chordFrequency(note,cents),start,mode==='horizontal'?0.7:1.6,mode==='horizontal'?0.14:0.20/chordQuestion.notes.length);
   });
 }
 function playChordQuestion(mode='horizontal'){if(!chordQuestion){newChordQuestion();return;}playChord(false,mode);}
@@ -327,6 +385,7 @@ function checkChordAnswer(){
   recordStat('chord',correct,chordQuestion.cents,{voice:chordVoice===chordQuestion.wrongVoice,direction:chordVoice===-1 ? chordQuestion.wrongVoice===-1 : chordQuestion.wrongVoice!==-1 && chordDirection===(chordQuestion.cents<0?'flat':'sharp')});
 }
 initChordTrainer();
+restoreOptions();
 renderStats();
 </script>
 </body>
