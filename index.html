@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="theme-color" content="#14171c">
 <meta name="color-scheme" content="dark">
-<title>Interval Intonation Trainer</title>
+<title>Interval Intonation Trainer v2.3</title>
 <style>
 :root { color-scheme: dark; --bg:#14171c; --fg:#e8edf3; --surface:#242a33; --border:#586475; --muted:#b4c0cf; --accent:#335c76; }
 html {background:var(--bg);}
@@ -35,13 +35,17 @@ small {color:var(--muted);}
 .stats-table th,.stats-table td {border-bottom:1px solid var(--border);padding:7px 9px;text-align:left;}
 .stats-table th {color:var(--muted);}
 .stats-table td:not(:first-child),.stats-table th:not(:first-child) {text-align:right;}
+.diagnostics {border:1px solid var(--border);border-radius:6px;padding:12px;margin:14px 0;background:#1c222a;}
+.diagnostics pre {white-space:pre-wrap;overflow-wrap:anywhere;font-size:0.8rem;color:var(--muted);}
+.diagnostic-entry {border-top:1px solid var(--border);padding:10px 0;}
+.diagnostic-entry:first-child {border-top:0;}
 @media(max-width:600px){body{margin:12px auto;padding:0 10px;}button,input,select{max-width:100%;}h1{font-size:1.5rem;}h2{font-size:1.25rem;}}
 </style>
 </head>
 <body>
 <h1>Interval Intonation Trainer</h1>
 <p id="soundOptions"><label>Sound: <select id="soundWave" onchange="saveSoundPreference()"><option value="triangle">Triangle (default)</option><option value="sine">Sine</option><option value="square">Square</option><option value="sawtooth">Sawtooth</option></select></label></p>
-<nav><button id="trainTab" aria-current="page" onclick="showPage('train')">Interval Trainer</button><button id="chordTab" onclick="showPage('chord')">Chord Trainer</button></nav>
+<nav><button id="trainTab" aria-current="page" onclick="showPage('train')">Interval Trainer</button><button id="chordTab" onclick="showPage('chord')">Chord Trainer</button><button id="tonalTab" onclick="showPage('tonal')">Tonal Context</button></nav>
 <section id="trainPage">
 <h2>Interval Trainer</h2>
 <button class="settings-toggle" id="intervalOptionsToggle" aria-expanded="true" aria-controls="intervalOptions" onclick="toggleOptions('interval')" title="Hide interval options" aria-label="Hide interval options">⚙</button>
@@ -65,6 +69,7 @@ small {color:var(--muted);}
 <p id="intervalStats" class="stats-summary"></p>
 <details id="intervalDetailStats"><summary>Accuracy by interval</summary><div class="stats-table-wrap"><table class="stats-table"><thead><tr><th>Interval</th><th>Recognition</th><th>Direction</th><th>Both</th></tr></thead><tbody id="intervalStatsRows"></tbody></table></div><small>Grouped by the correct interval, including wrong answers. Data begins with v2.0; previous totals are retained above.</small></details>
 <button onclick="resetStats('interval')">Reset interval statistics</button>
+<div id="intervalDiagnostics" class="diagnostics"><details><summary>Question diagnostics / Report a problem</summary><p><small>After answering, copy a report or replay the exact question. Recent questions stay in this browser (last 20).</small></p><div id="intervalHistory"></div></details></div>
 
 </section>
 <section id="settingsPage" hidden>
@@ -94,7 +99,27 @@ small {color:var(--muted);}
 <h2 id="chordResult" aria-live="polite"></h2>
 <div id="chordReplayButtons" hidden><strong>Given chord:</strong> <button onclick="playChordGiven('horizontal')">Horizontal</button><button onclick="playChordGiven('vertical')">Vertical</button><br><strong>Correct chord:</strong> <button onclick="playChordCorrect('horizontal')">Horizontal</button><button onclick="playChordCorrect('vertical')">Vertical</button></div>
 <p id="chordStats" class="stats-summary"></p><button onclick="resetStats('chord')">Reset chord statistics</button>
+<div id="chordDiagnostics" class="diagnostics"><details><summary>Question diagnostics / Report a problem</summary><p><small>After answering, copy a report or replay the exact question. Recent questions stay in this browser (last 20).</small></p><div id="chordHistory"></div></details></div>
 <p><small>Inversions move lower chord tones up an octave; voice buttons are shown low to high. Horizontal plays the voices low to high; vertical plays them together. Both replay the same question. After answering, compare the given and corrected chords in either style.</small></p>
+</section>
+<section id="tonalPage" hidden>
+<h2>Tonal Context Trainer</h2>
+<p><small>Hear a short progression establish the key, then identify a target note's scale degree and intonation. The target can be a non-chord tone.</small></p>
+<button class="settings-toggle" id="tonalOptionsToggle" aria-expanded="true" aria-controls="tonalOptions" onclick="toggleOptions('tonal')" title="Hide tonal options" aria-label="Hide tonal options">⚙</button>
+<div id="tonalOptions" class="options-panel">
+<label>Key: <select id="tonalMode"><option value="major">Major</option><option value="minor">Natural minor</option><option value="chromatic">Chromatic (major-key harmony)</option></select></label><br>
+<label>Cents off: <input id="tonalCents" type="number" value="30" min="0" max="1200" step="any" style="width:85px"></label><br>
+<label>Tonic: <select id="tonalRootMode"><option value="fixed">Fixed C4</option><option value="random">Random each question</option></select></label><br>
+<label>Tuning system: <select id="tonalTuning"><option value="equal">Equal temperament (12-TET)</option><option value="just">Just intonation (5-limit)</option><option value="pythagorean">Pythagorean</option></select></label><br>
+<label>Target octave: <select id="tonalOctave"><option value="4">Around tonic (C4–B4)</option><option value="5">One octave above (C5–B5)</option></select></label>
+</div>
+<p><button onclick="newTonalQuestion()">New Question</button><button onclick="playTonalQuestion()">Replay Context + Note</button><button onclick="playTonalTarget()">Replay Target</button><button onclick="playTonalTogether()">Target over Tonic</button></p>
+<h3>What scale degree was the target?</h3><div id="tonalNoteButtons" class="choices"></div>
+<h3>Was it...</h3><div class="choices"><button id="tonalFlat" onclick="answerTonalDirection('flat')">Flat</button><button id="tonalIn" onclick="answerTonalDirection('in')">In Tune</button><button id="tonalSharp" onclick="answerTonalDirection('sharp')">Sharp</button></div>
+<h2 id="tonalResult" aria-live="polite"></h2>
+<div id="tonalReplayButtons" hidden><p><strong>Given:</strong> <button onclick="playTonalQuestion(false)">Context + Note</button><button onclick="playTonalTogether(false)">Over Tonic</button></p><p><strong>Correct:</strong> <button onclick="playTonalQuestion(true)">Context + Note</button><button onclick="playTonalTogether(true)">Over Tonic</button></p></div>
+<p id="tonalStats" class="stats-summary"></p><button onclick="resetStats('tonal')">Reset tonal statistics</button>
+<div class="diagnostics"><details><summary>Question diagnostics / Report a problem</summary><p><small>Saved frequencies, answers and replay for the last 20 questions.</small></p><div id="tonalHistory"></div></details></div>
 </section>
 <script>
 const AudioContextClass = window.AudioContext || window.webkitAudioContext;
@@ -117,6 +142,102 @@ let selectedIntervals = [...presets.major];
 let correctNote = null, correctTune = null, givenCents = null, questionType = 'ascending', questionTuning = 'equal';
 let userNote = null, userTune = null, playbackGeneration = 0, answered = false;
 let intervalRoot = root;
+const appVersion='2.3';
+const historyKey='intonationTrainerQuestionHistoryV22';
+let questionHistory=[];
+try {const stored=JSON.parse(localStorage.getItem(historyKey));if(Array.isArray(stored))questionHistory=stored.slice(0,20);}catch(e){}
+let intervalQuestionId=null;
+let chordQuestionId=null;
+let nextQuestionId=Date.now();
+function saveHistory(){
+ questionHistory=questionHistory.slice(0,20);
+ try{localStorage.setItem(historyKey,JSON.stringify(questionHistory));}catch(e){}
+ renderHistory();
+}
+function addHistory(q){
+ q.id=++nextQuestionId;
+ q.created=new Date().toISOString();
+ q.status='unanswered';
+ q.wave=$('soundWave').value;
+ questionHistory.unshift(q);
+ saveHistory();
+ return q.id;
+}
+function completeHistory(id,answer,correct){
+ const q=questionHistory.find(q=>q.id===id);
+ if(q){q.status='answered';q.answer=answer;q.correct=correct;saveHistory();}
+}
+function fmtHz(hz){return Number(hz).toFixed(4)+' Hz';}
+function reportText(q){
+ const lines=[`Interval Intonation Trainer v${appVersion} — Question report`,`Question ID: ${q.id}`,`Created: ${q.created}`,`Trainer: ${q.kind}`,`Status: ${q.status}`,`Waveform: ${q.wave}`,`Tuning: ${q.tuning}`,`Root frequency: ${fmtHz(q.root)}`];
+ if(q.kind==='interval'){
+  lines.push(`Interval: ${names[q.note]} (${q.note} semitones)`,`Presentation: ${q.mode}`,`Selected intervals: ${q.selected.map(n=>names[n]).join(', ')}`,`Correct target frequency: ${fmtHz(q.targetHz)}`,`Played target frequency: ${fmtHz(q.givenHz)}`,`Offset: ${q.cents>0?'+':''}${q.cents} cents`,`Expected: ${names[q.note]}, ${q.cents<0?'flat':q.cents>0?'sharp':'in tune'}`);
+ }else if(q.kind==='tonal'){
+  lines.push(`Mode: ${q.mode}`,`Progression: ${q.progression}`,`Target: ${names[q.note]} (${q.note} semitones, octave +${q.octave})`,`Correct target: ${fmtHz(q.targetHz)}`,`Played target: ${fmtHz(q.givenHz)}`,`Offset: ${q.cents} cents`,`Context chords: ${q.chords.map(ch=>ch.map(fmtHz).join(', ')).join(' / ')}`,`Expected: ${names[q.note]}, ${q.cents<0?'flat':q.cents>0?'sharp':'in tune'}`);
+ }else{
+  lines.push(`Chord preset: ${q.preset}`,`Inversion: ${q.inversion}`,`Voices (low to high):`);
+  q.notes.forEach((n,i)=>lines.push(`  ${i+1}. ${chordNoteName(q.baseNotes[q.voices[i].factor])}, pitch=${n} semitones, correct=${fmtHz(q.correctHz[i])}, played=${fmtHz(q.givenHz[i])}, offset=${i===q.wrongVoice?q.cents:0} cents`));
+  lines.push(`Expected: ${q.wrongVoice===-1?'All correct':`Voice ${q.wrongVoice+1} (${chordNoteName(q.baseNotes[q.voices[q.wrongVoice].factor])}), ${q.cents<0?'flat':'sharp'}`}`);
+ }
+ lines.push(`User answer: ${q.status==='answered'?JSON.stringify(q.answer):'(not answered)'}`,`Scored correct: ${q.status==='answered'?q.correct:'(not answered)'}`,`Browser: ${navigator.userAgent}`);
+ return lines.join('\n');
+}
+function playSavedQuestion(id,mode='original',corrected=false){
+ const q=questionHistory.find(q=>q.id===id);
+ if(!q||q.status!=='answered')return;
+ audio();stopPlayback();
+ const t=ctx.currentTime+0.03;
+ const wave=q.wave;
+ if(q.kind==='interval'){
+  const actualMode=mode==='original'?q.mode:mode;
+  const target=corrected?q.targetHz:q.givenHz;
+  if(actualMode==='harmonic'){
+   playTone(q.root,t,0.9,0.095,wave);playTone(target,t,0.9,0.095,wave);
+  }else if(actualMode==='descending'||(actualMode==='separate'&&q.mode==='descending')){
+   playTone(target,t,0.9,0.14,wave);playTone(q.root,t+1.2,0.9,0.14,wave);
+  }else{
+   playTone(q.root,t,0.9,0.14,wave);playTone(target,t+1.2,0.9,0.14,wave);
+  }
+ }else if(q.kind==='tonal'){
+  playTonalAudio(q,corrected,mode==='original'?'context':mode);
+ }else{
+  const actualMode=mode==='original'?'vertical':mode;
+  const freqs=corrected?q.correctHz:q.givenHz;
+  freqs.forEach((f,i)=>playTone(f,actualMode==='horizontal'?t+i*0.85:t,actualMode==='horizontal'?0.7:1.6,actualMode==='horizontal'?0.14:0.20/freqs.length,wave));
+ }
+}
+async function copyQuestionReport(id){
+ const q=questionHistory.find(q=>q.id===id);if(!q||q.status!=='answered')return;
+ const value=reportText(q);
+ try{await navigator.clipboard.writeText(value);alert('Question report copied.');}
+ catch(e){
+  const ta=document.createElement('textarea');ta.value=value;ta.style.width='100%';ta.rows=12;
+  const holder=$(q.kind==='interval'?'intervalHistory':q.kind==='chord'?'chordHistory':'tonalHistory');holder.prepend(ta);ta.focus();ta.select();
+  alert('Clipboard unavailable. Select and copy the report shown above.');
+ }
+}
+function renderHistory(){
+ for(const kind of ['interval','chord','tonal']){
+  const holder=$(kind==='interval'?'intervalHistory':kind==='chord'?'chordHistory':'tonalHistory');if(!holder)continue;
+  const items=questionHistory.filter(q=>q.kind===kind&&q.status==='answered');
+  holder.replaceChildren();
+  if(!items.length){holder.textContent='No answered questions yet.';continue;}
+  items.forEach(q=>{
+   const div=document.createElement('div');div.className='diagnostic-entry';
+   const title=document.createElement('div');
+   title.textContent=`#${q.id} · ${new Date(q.created).toLocaleString()} · ${q.kind==='chord'?q.preset:names[q.note]} · ${q.correct?'Correct':'Incorrect'}`;
+   div.appendChild(title);
+   const addBtn=(label,fn)=>{const b=document.createElement('button');b.textContent=label;b.addEventListener('click',fn);div.appendChild(b);};
+   addBtn('Replay given',()=>playSavedQuestion(q.id,'original',false));
+   addBtn('Replay corrected',()=>playSavedQuestion(q.id,'original',true));
+   addBtn('Copy report',()=>copyQuestionReport(q.id));
+   const details=document.createElement('details'),summary=document.createElement('summary'),pre=document.createElement('pre');
+   summary.textContent='Show exact frequencies and answers';pre.textContent=reportText(q);
+   details.append(summary,pre);div.appendChild(details);holder.appendChild(div);
+  });
+ }
+}
+
 function chooseRoot(mode) { return mode === 'random' ? 220 * Math.pow(2, Math.floor(Math.random()*13)/12) : root; }
 const statsKey='intervalIntonationTrainerStatsV15';
 let stats;
@@ -147,14 +268,14 @@ function scoreText(name,score){
  return `${name}: ${score.correct}/${score.total} (${pct}%)`;
 }
 function renderStats(){
- for(const kind of ['interval','chord']){
+ for(const kind of ['interval','chord','tonal']){
   const st=stats[kind],pct=st.total?Math.round(100*st.correct/st.total):0;
   const breakdown=Object.entries(st.byCents).sort((a,b)=>Number(b[0])-Number(a[0])).map(([c,v])=>`${c}¢: ${v.correct}/${v.total}`).join(' · ');
-  const components=kind==='interval'?[['Interval recognition',st.note],['Tuning direction',st.direction]]:[['Wrong voice',st.voice],['Tuning direction',st.direction]];
+  const components=kind==='chord'?[['Wrong voice',st.voice],['Tuning direction',st.direction]]:[['Scale degree',st.note],['Tuning direction',st.direction]];
   const componentLines=components.map(([label,v])=>scoreText(label,v)).join('\n');
   const direction=st.direction;
   const directionBreakdown=direction?Object.entries(direction.byCents).sort((a,b)=>Number(b[0])-Number(a[0])).map(([c,v])=>`${c}¢: ${v.correct}/${v.total}`).join(' · '):'';
-  $(kind==='interval'?'intervalStats':'chordStats').textContent=`Complete answer: ${st.correct}/${st.total} (${pct}%)\n${componentLines}`+(breakdown?'\nComplete by offset: '+breakdown:'')+(directionBreakdown?'\nDirection by offset: '+directionBreakdown:'');
+  $(kind==='interval'?'intervalStats':kind==='chord'?'chordStats':'tonalStats').textContent=`Complete answer: ${st.correct}/${st.total} (${pct}%)\n${componentLines}`+(breakdown?'\nComplete by offset: '+breakdown:'')+(directionBreakdown?'\nDirection by offset: '+directionBreakdown:'');
   if(kind==='interval'){
    const entries=Object.entries(st.byInterval||{}).sort((a,b)=>Number(a[0])-Number(b[0]));
    const fmt=(n,total)=>`${n}/${total} (${Math.round(100*n/total)}%)`;
@@ -174,7 +295,7 @@ function toggleOptions(kind){
  try{localStorage.setItem('intonationOptionsCollapsed_'+kind, panel.hidden?'1':'0');}catch(e){}
 }
 function restoreOptions(){
- for(const kind of ['interval','chord']){
+ for(const kind of ['interval','chord','tonal']){
   try{if(localStorage.getItem('intonationOptionsCollapsed_'+kind)==='1')toggleOptions(kind);}catch(e){}
  }
 }
@@ -183,9 +304,11 @@ function showPage(page) {
   $('trainPage').hidden = page !== 'train';
   $('settingsPage').hidden = page !== 'settings';
   $('chordPage').hidden = page !== 'chord';
+  $('tonalPage').hidden = page !== 'tonal';
   $('trainTab').setAttribute('aria-current', page === 'train' ? 'page' : 'false');
   
   $('chordTab').setAttribute('aria-current', page === 'chord' ? 'page' : 'false');
+  $('tonalTab').setAttribute('aria-current', page === 'tonal' ? 'page' : 'false');
 }
 function buildControls() {
   renderNoteButtons();
@@ -229,9 +352,9 @@ function stopPlayback(){
   });
   activeVoices=[];
 }
-function playTone(freq,at,duration=0.9,volume=0.14){
+function playTone(freq,at,duration=0.9,volume=0.14,wave=null){
   const osc=ctx.createOscillator(),gain=ctx.createGain();
-  osc.type=$('soundWave').value;
+  osc.type=wave||$('soundWave').value;
   osc.frequency.setValueAtTime(freq,at);
   osc.connect(gain);gain.connect(ctx.destination);
   const attack=0.035,release=0.12;
@@ -267,6 +390,7 @@ function newQuestion() {
   userNote=null; userTune=null; answered=false;
   $('result').textContent=''; $('replayButtons').hidden=true;
   document.querySelectorAll('.selected').forEach(b=>b.classList.remove('selected'));
+  intervalQuestionId=addHistory({kind:'interval',root:intervalRoot,note:correctNote,cents:givenCents,mode:questionType,tuning:questionTuning,selected:[...selectedIntervals],targetHz:frequency(correctNote,0),givenHz:frequency(correctNote,givenCents)});
   playQuestion();
 }
 function playQuestion(mode=null) {if(correctNote===null) {newQuestion();return;} playInterval(givenCents,mode||questionType);}
@@ -288,6 +412,7 @@ function check() {
   const label=correctTune==='in'?'in tune':correctTune;
   $('result').textContent = userNote===correctNote && userTune===correctTune ? '✅ Correct!' : `❌ Correct answer: ${names[correctNote]}, ${label}`;
   $('replayButtons').hidden=false;
+  completeHistory(intervalQuestionId,{note:names[userNote],direction:userTune},userNote===correctNote && userTune===correctTune);
   recordStat('interval',userNote===correctNote && userTune===correctTune,givenCents,{note:userNote===correctNote,direction:userTune===correctTune},correctNote);
 }
 function playGiven(mode) {playInterval(givenCents,mode);}
@@ -336,7 +461,10 @@ function newChordQuestion(){
   const outcome=Math.floor(Math.random()*(notes.length*2+1));
   const wrongVoice=amount===0||outcome===notes.length*2?-1:Math.floor(outcome/2);
   const cents=wrongVoice===-1?0:(outcome%2===0?-amount:amount);
-  chordQuestion={notes,voices,inversion,wrongVoice,cents,tuning:$('chordTuning').value,root:chooseRoot($('chordRootMode').value)};
+  chordQuestion={preset:$('chordPreset').value,baseNotes,notes,voices,inversion,wrongVoice,cents,tuning:$('chordTuning').value,root:chooseRoot($('chordRootMode').value)};
+  const correctHz=notes.map(n=>chordFrequency(n,0));
+  const givenHz=notes.map((n,i)=>chordFrequency(n,i===wrongVoice?cents:0));
+  chordQuestionId=addHistory({kind:'chord',preset:chordQuestion.preset,baseNotes:[...baseNotes],notes:[...notes],voices:voices.map(v=>({...v})),inversion,wrongVoice,cents,tuning:chordQuestion.tuning,root:chordQuestion.root,correctHz,givenHz});
   chordVoice=null; chordDirection=null; chordAnswered=false;
   $('chordResult').textContent=''; $('chordReplayButtons').hidden=true;
   $('chordVoiceButtons').innerHTML=notes.map((n,i)=>`<button id="chordVoice${i}" onclick="answerChordVoice(${i})">${chordNoteName(baseNotes[voices[i].factor])}${voices[i].factor===0?' (root)':''}</button>`).join('');
@@ -379,14 +507,74 @@ function checkChordAnswer(){
   if(chordVoice===null||(chordVoice!==-1&&chordDirection===null)||chordAnswered)return;
   chordAnswered=true;
   const correct=chordVoice===chordQuestion.wrongVoice && (chordVoice===-1||chordDirection===(chordQuestion.cents<0?'flat':'sharp'));
-  const answer=chordQuestion.wrongVoice===-1?'All are correct':`${chordNoteName(chordPresets[$('chordPreset').value][chordQuestion.voices[chordQuestion.wrongVoice].factor])} (voice ${chordQuestion.wrongVoice+1}, low to high) is ${chordQuestion.cents<0?'flat':'sharp'}`;
+  const answer=chordQuestion.wrongVoice===-1?'All are correct':`${chordNoteName(chordQuestion.baseNotes[chordQuestion.voices[chordQuestion.wrongVoice].factor])} (voice ${chordQuestion.wrongVoice+1}, low to high) is ${chordQuestion.cents<0?'flat':'sharp'}`;
   $('chordResult').textContent=correct?'✅ Correct!':`❌ Correct answer: ${answer}`;
   $('chordReplayButtons').hidden=false;
+  completeHistory(chordQuestionId,{voice:chordVoice,direction:chordVoice===-1?'all correct':chordDirection},correct);
   recordStat('chord',correct,chordQuestion.cents,{voice:chordVoice===chordQuestion.wrongVoice,direction:chordVoice===-1 ? chordQuestion.wrongVoice===-1 : chordQuestion.wrongVoice!==-1 && chordDirection===(chordQuestion.cents<0?'flat':'sharp')});
 }
 initChordTrainer();
+
+// Tonal Context Trainer: progression establishes a tonic, then a separate target is tested.
+let tonalQuestion=null,tonalNote=null,tonalDirection=null,tonalAnswered=false,tonalQuestionId=null;
+function tonalRatio(n,tuning){return tuning==='equal'?Math.pow(2,n/12):tuningRatios[tuning][n%12]*Math.pow(2,Math.floor(n/12));}
+function tonalHz(rootHz,n,tuning){return rootHz*tonalRatio(n,tuning);}
+function tonalScale(mode){return mode==='minor'?presets.minor:mode==='chromatic'?presets.chromatic:presets.major;}
+function tonalBuildButtons(){
+ const scale=tonalScale($('tonalMode').value);
+ $('tonalNoteButtons').innerHTML=scale.map(n=>`<button id="tonalNote${n}" onclick="answerTonalNote(${n})">${names[n]}</button>`).join('');
+}
+function newTonalQuestion(){
+ const mode=$('tonalMode').value,scale=tonalScale(mode),rootHz=chooseRoot($('tonalRootMode').value),tuning=$('tonalTuning').value;
+ const note=scale[Math.floor(Math.random()*scale.length)];
+ const amount=Math.min(1200,Math.max(0,Math.abs(Number($('tonalCents').value)||0)));
+ const cents=[-amount,0,amount][Math.floor(Math.random()*3)];
+ const octave=Number($('tonalOctave').value)-4;
+ // I–IV–V–I (major) or i–iv–V–i (minor), voiced below the target.
+ const progression=mode==='minor'?'i – iv – V – i':'I – IV – V – I';
+ const chords=(mode==='minor'?[[0,3,7],[5,8,12],[7,11,14],[0,3,7]]:[[0,4,7],[5,9,12],[7,11,14],[0,4,7]])
+   .map(tones=>tones.map(n=>tonalHz(rootHz/2,n,tuning)));
+ const targetHz=tonalHz(rootHz,note+octave*12,tuning);
+ tonalQuestion={kind:'tonal',root:rootHz,mode,progression,tuning,note,octave,cents,chords,targetHz,givenHz:targetHz*Math.pow(2,cents/1200)};
+ tonalQuestion.wave=$('soundWave').value;
+ tonalQuestionId=addHistory({...tonalQuestion,chords:chords.map(c=>[...c])});
+ tonalNote=null;tonalDirection=null;tonalAnswered=false;
+ $('tonalResult').textContent='';$('tonalReplayButtons').hidden=true;
+ tonalBuildButtons();
+ ['tonalFlat','tonalIn','tonalSharp'].forEach(id=>$(id).classList.remove('selected'));
+ playTonalQuestion();
+}
+function playTonalAudio(q,corrected=false,mode='context'){
+ audio();stopPlayback();
+ const t=ctx.currentTime+0.04,target=corrected?q.targetHz:q.givenHz;
+ if(mode==='together'){
+  playTone(q.root/2,t,1.8,0.085,q.wave);playTone(target,t,1.8,0.13,q.wave);return;
+ }
+ if(mode==='target'){playTone(target,t,1.2,0.14,q.wave);return;}
+ q.chords.forEach((ch,i)=>ch.forEach(f=>playTone(f,t+i*0.9,0.77,0.065,q.wave)));
+ playTone(target,t+q.chords.length*0.9+0.20,1.25,0.15,q.wave);
+}
+function playTonalQuestion(corrected=false){if(!tonalQuestion){newTonalQuestion();return;}playTonalAudio(tonalQuestion,corrected,'context');}
+function playTonalTarget(){if(!tonalQuestion){newTonalQuestion();return;}playTonalAudio(tonalQuestion,false,'target');}
+function playTonalTogether(corrected=false){if(!tonalQuestion){newTonalQuestion();return;}playTonalAudio(tonalQuestion,corrected,'together');}
+function answerTonalNote(n){if(!tonalQuestion||tonalAnswered)return;tonalNote=n;document.querySelectorAll('#tonalNoteButtons button').forEach(b=>b.classList.remove('selected'));$('tonalNote'+n).classList.add('selected');checkTonal();}
+function answerTonalDirection(d){if(!tonalQuestion||tonalAnswered)return;tonalDirection=d;['flat','in','sharp'].forEach(v=>$('tonal'+v[0].toUpperCase()+v.slice(1)).classList.toggle('selected',v===d));checkTonal();}
+function checkTonal(){
+ if(tonalNote===null||tonalDirection===null||tonalAnswered)return;
+ tonalAnswered=true;
+ const q=tonalQuestion,expected=q.cents<0?'flat':q.cents>0?'sharp':'in';
+ const noteOK=tonalNote===q.note,dirOK=tonalDirection===expected,ok=noteOK&&dirOK;
+ $('tonalResult').textContent=ok?'✅ Correct!':`❌ Correct answer: ${names[q.note]}, ${expected==='in'?'in tune':expected}`;
+ $('tonalReplayButtons').hidden=false;
+ completeHistory(tonalQuestionId,{note:names[tonalNote],direction:tonalDirection},ok);
+ recordStat('tonal',ok,q.cents,{note:noteOK,direction:dirOK});
+}
+$('tonalMode').addEventListener('change',tonalBuildButtons);
+tonalBuildButtons();
+
 restoreOptions();
 renderStats();
+renderHistory();
 </script>
 </body>
 </html>
