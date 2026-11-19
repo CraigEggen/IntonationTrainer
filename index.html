@@ -138,7 +138,7 @@ small {color:var(--muted);}
 <p><label>Notes per beat: <select id="circleSubdivision"><option value="1">1 (quarter notes)</option><option value="2">2 (eighth notes)</option><option value="3">3 (triplets)</option><option value="4">4 (sixteenth notes)</option></select></label></p>
 <p><label>Exercise preset: <select id="circlePreset"><option value="custom">Custom pattern</option></select></label></p>
 <p><label>Pattern (comma-separated): <input id="circlePattern" value="Do, Re, Mi, Fa" style="width:min(100%,400px)" spellcheck="false" aria-describedby="circlePatternHelp circlePatternFeedback"></label></p>
-<p><small id="circlePatternHelp">One entry per subdivision; presets can span several bars and repeat at their own bar boundary. Use Do, Ra, Re, Me, Mi, Fa, Fi, So, Le, La, Te, Ti, or - for silence. Use - for rests; patterns repeat at their full length.</small></p>
+<p><small id="circlePatternHelp">One entry per subdivision; presets can span several bars and repeat at their own bar boundary. Use Do, Ra, Re, Me, Mi, Fa, Fi, So, Le, La, Te, Ti; add 8 for the octave above (Do8, Re8), or -1 for the octave below (Ti-1, Do-1). Use - for silence. Use - for rests; patterns repeat at their full length.</small></p>
 <p id="circlePatternFeedback" role="status" aria-live="polite"></p>
 <p><button type="button" id="circlePatternFill" onclick="circleFitPattern()">Fit pattern to meter</button></p>
 <label>Guide volume: <input type="range" id="circleGuideVolume" min="0" max="100" value="30"></label>
@@ -687,6 +687,12 @@ const circleDrone=createDroneManager(),violinDrone=createDroneManager();
 const circleNames=['C','G','D','A','E','B','F♯','D♭','A♭','E♭','B♭','F'];
 const circlePitchClasses=[0,7,2,9,4,11,6,1,8,3,10,5];
 const circleSyllables={do:0,ra:1,re:2,me:3,mi:4,fa:5,fi:6,so:7,le:8,la:9,te:10,ti:11};
+function circleParseNote(token){
+ if(token==='-')return null;
+ const match=/^(do|ra|re|me|mi|fa|fi|so|le|la|te|ti)(8|-1)?$/.exec(token);
+ if(!match)return undefined;
+ return circleSyllables[match[1]]+(match[2]==='8'?12:match[2]==='-1'?-12:0);
+}
 let circleTimer=null,circleNextTime=0,circleBeatIndex=0,circleSettings=null,circleDisplayTimers=[];
 
 function circleFrequency(midi){return 440*Math.pow(2,(midi-69)/12);}
@@ -770,7 +776,7 @@ const circlePresets={
  'seventh':{name:'Major seventh 1–3–5–7–8–7–5–3–1',notes:'Do Mi So Ti Do Ti So Mi Do',meter:3,subdivision:2},
  'scale':{name:'Major scale up and down',notes:'Do Re Mi Fa So La Ti Do Ti La So Fa Mi Re Do',meter:4,subdivision:2},
  'pentascale':{name:'Five-note scale up and down',notes:'Do Re Mi Fa So Fa Mi Re Do',meter:3,subdivision:2},
- 'dominant-retarget':{name:'Dominant retarget: Do–Mi–So–Ti–Re–So',notes:'Do Mi So Ti Re So',meter:3,subdivision:2},
+ 'dominant-retarget':{name:'Dominant retarget: Do–Mi–So–Ti–Re8–So',notes:'Do Mi So Ti Re8 So',meter:3,subdivision:2},
  'resolution':{name:'Dominant resolution → circle of fourths (C7 → F7 → B♭7 …)',notes:'Do Mi So Te La Fa',meter:3,subdivision:2,special:true},
  'descending-5721':{name:'Descending 5–7–2–1',notes:'So Ti Re Do',meter:4,subdivision:1},
  'mixolydian':{name:'Mixolydian scale',notes:'Do Re Mi Fa So La Te Do',meter:4,subdivision:2},
@@ -802,7 +808,7 @@ $('circleMeter').addEventListener('change',()=>{$('circlePreset').value='custom'
 $('circleSubdivision').addEventListener('change',()=>{$('circlePreset').value='custom';circleUpdateResolutionUI();});
 function circlePatternError(){
  const raw=circlePatternTokens(),perBar=Number($('circleMeter').value)*Number($('circleSubdivision').value);
- if(raw.some(x=>x!=='-'&&!Object.hasOwn(circleSyllables,x)))return 'Unrecognized syllable. Use Do, Ra, Re, Me, Mi, Fa, Fi, So, Le, La, Te, Ti, or -.';
+ if(raw.some(x=>circleParseNote(x)===undefined))return 'Unrecognized note. Use solfège syllables, optional 8 (above) or -1 (below), or - for a rest.';
  if(!raw.length||raw.length%perBar!==0)return `Pattern has ${raw.length} slots; each full bar needs ${perBar}. Add rests (-) to complete the last bar.`;
  if(raw.length/perBar>64)return 'Pattern cannot exceed 64 bars.';
  return '';
@@ -817,7 +823,7 @@ function circleUpdatePatternFeedback(){
 }
 function circleFitPattern(){
  const required=Number($('circleMeter').value)*Number($('circleSubdivision').value);
- const raw=circlePatternTokens().filter(x=>x==='-'||Object.hasOwn(circleSyllables,x));
+ const raw=circlePatternTokens().filter(x=>circleParseNote(x)!==undefined);
  const fallback=['do','re','mi','fa','so','la','ti','do'];
  $('circlePattern').value=Array.from({length:Math.max(required,Math.ceil(raw.length/required)*required)},(_,i)=>raw[i]||'-').map(x=>x==='-'?'-':x[0].toUpperCase()+x.slice(1)).join(', ');
  circleUpdatePatternFeedback();
@@ -832,7 +838,7 @@ function startCircle(){
  const resolution=$('circlePreset').value==='resolution';
  if(resolution && (Number($('circleMeter').value)!==3 || Number($('circleSubdivision').value)!==2 || raw.join(' ')!=='do mi so te la fa')){alert('Select the Dominant resolution preset again to restore its six eighth-note pattern.');return;}
  if($('circleGuide').checked && circlePatternError()){alert(circlePatternError());circleUpdatePatternFeedback();return;}
- circleSettings={tempo,bars,meter:Number($('circleMeter').value),direction:$('circleDirection').value,start:Number($('circleStart').value),register:$('circleRegister').value,drone:$('circleDrone').value,volume:Number($('circleVolume').value),guide:$('circleGuide').checked,subdivision:Number($('circleSubdivision').value),guideVolume:Number($('circleGuideVolume').value),pattern:raw.map(x=>x==='-'?null:circleSyllables[x]),patternBars:raw.length/(Number($('circleMeter').value)*Number($('circleSubdivision').value)),resolution};
+ circleSettings={tempo,bars,meter:Number($('circleMeter').value),direction:$('circleDirection').value,start:Number($('circleStart').value),register:$('circleRegister').value,drone:$('circleDrone').value,volume:Number($('circleVolume').value),guide:$('circleGuide').checked,subdivision:Number($('circleSubdivision').value),guideVolume:Number($('circleGuideVolume').value),pattern:raw.map(circleParseNote),patternBars:raw.length/(Number($('circleMeter').value)*Number($('circleSubdivision').value)),resolution};
  audio();stopPlayback();circleBeatIndex=0;circleNextTime=ctx.currentTime+0.08;
  $('circleStartButton').disabled=true;$('circleStopButton').disabled=false;
  document.querySelectorAll('#circleOptions input,#circleOptions select').forEach(el=>el.disabled=true);
