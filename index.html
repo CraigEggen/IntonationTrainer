@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="theme-color" content="#14171c">
 <meta name="color-scheme" content="dark">
-<title>Interval Intonation Trainer v2.3</title>
+<title>Interval Intonation Trainer v2.8</title>
 <style>
 :root { color-scheme: dark; --bg:#14171c; --fg:#e8edf3; --surface:#242a33; --border:#586475; --muted:#b4c0cf; --accent:#335c76; }
 html {background:var(--bg);}
@@ -45,7 +45,7 @@ small {color:var(--muted);}
 <body>
 <h1>Interval Intonation Trainer</h1>
 <p id="soundOptions"><label>Sound: <select id="soundWave" onchange="saveSoundPreference()"><option value="triangle">Triangle (default)</option><option value="sine">Sine</option><option value="square">Square</option><option value="sawtooth">Sawtooth</option></select></label></p>
-<nav><button id="trainTab" aria-current="page" onclick="showPage('train')">Interval Trainer</button><button id="chordTab" onclick="showPage('chord')">Chord Trainer</button><button id="tonalTab" onclick="showPage('tonal')">Tonal Context</button></nav>
+<nav><button id="trainTab" aria-current="page" onclick="showPage('train')">Interval Trainer</button><button id="chordTab" onclick="showPage('chord')">Chord Trainer</button><button id="tonalTab" onclick="showPage('tonal')">Tonal Context</button><button id="circleTab" onclick="showPage('circle')">Circle Practice</button><button id="violinTab" onclick="showPage('violin')">Violin Practice</button></nav>
 <section id="trainPage">
 <h2>Interval Trainer</h2>
 <button class="settings-toggle" id="intervalOptionsToggle" aria-expanded="true" aria-controls="intervalOptions" onclick="toggleOptions('interval')" title="Hide interval options" aria-label="Hide interval options">⚙</button>
@@ -121,6 +121,62 @@ small {color:var(--muted);}
 <p id="tonalStats" class="stats-summary"></p><button onclick="resetStats('tonal')">Reset tonal statistics</button>
 <div class="diagnostics"><details><summary>Question diagnostics / Report a problem</summary><p><small>Saved frequencies, answers and replay for the last 20 questions.</small></p><div id="tonalHistory"></div></details></div>
 </section>
+<section id="circlePage" hidden>
+<h2>Circle of Fifths — Singing Practice</h2><p><small>Includes preset exercises from your vocal practice routine; choose a preset to fill the solfège guide automatically.</small></p>
+<p><small>Sing any exercise while the metronome keeps time and the drone changes key on a bar line. The tonic stays in a singable register rather than climbing indefinitely.</small></p>
+<div class="options-panel" id="circleOptions">
+<label>Tempo (BPM): <input type="number" id="circleTempo" min="5" max="240" value="80" style="width:80px"></label>
+<label>Meter: <select id="circleMeter"><option value="4">4/4</option><option value="3">3/4</option></select></label><br>
+<label>Bars per key: <input type="number" id="circleBars" min="1" max="64" value="4" style="width:75px"></label>
+<label>Direction: <select id="circleDirection"><option value="up">Ascending fifths (clockwise)</option><option value="down">Descending fifths (counterclockwise)</option></select></label><br>
+<label>Start key: <select id="circleStart"><option value="0">C</option><option value="1">G</option><option value="2">D</option><option value="3">A</option><option value="4">E</option><option value="5">B</option><option value="6">F♯</option><option value="7">D♭</option><option value="8">A♭</option><option value="9">E♭</option><option value="10">B♭</option><option value="11">F</option></select></label>
+<label>Drone register: <select id="circleRegister"><option value="low">Lower (near C3)</option><option value="middle" selected>Middle (near C4)</option><option value="high">Higher (near C5)</option></select></label><br>
+<label>Drone: <select id="circleDrone"><option value="tonic">Tonic</option><option value="fifth">Tonic + fifth</option><option value="triad">Major triad</option></select></label>
+<label>Drone volume: <input type="range" id="circleVolume" min="0" max="100" value="45" style="vertical-align:middle"></label>
+<details><summary>Optional solfège guide</summary>
+<p><label><input type="checkbox" id="circleGuide"> Play solfège notes with the metronome</label></p>
+<p><label>Notes per beat: <select id="circleSubdivision"><option value="1">1 (quarter notes)</option><option value="2">2 (eighth notes)</option><option value="3">3 (triplets)</option><option value="4">4 (sixteenth notes)</option></select></label></p>
+<p><label>Exercise preset: <select id="circlePreset"><option value="custom">Custom pattern</option></select></label></p>
+<p><label>Pattern (comma-separated): <input id="circlePattern" value="Do, Re, Mi, Fa" style="width:min(100%,400px)" spellcheck="false" aria-describedby="circlePatternHelp circlePatternFeedback"></label></p>
+<p><small id="circlePatternHelp">One entry per subdivision; presets can span several bars and repeat at their own bar boundary. Use Do, Ra, Re, Me, Mi, Fa, Fi, So, Le, La, Te, Ti, or - for silence. Use - for rests; patterns repeat at their full length.</small></p>
+<p id="circlePatternFeedback" role="status" aria-live="polite"></p>
+<p><button type="button" id="circlePatternFill" onclick="circleFitPattern()">Fit pattern to meter</button></p>
+<label>Guide volume: <input type="range" id="circleGuideVolume" min="0" max="100" value="30"></label>
+</details>
+</div>
+<p><button id="circleStartButton" onclick="startCircle()">▶ Start</button><button id="circleStopButton" onclick="stopCircle()" disabled>■ Stop</button></p>
+<div class="diagnostics" aria-live="polite"><strong id="circleKey">Current key: C</strong><p id="circleStatus">Ready · 4/4 · 80 BPM</p><p id="circleNext">Next: G</p><div id="circleBeats" aria-label="Beat indicators" style="display:flex;gap:9px;flex-wrap:wrap"></div></div>
+<p id="circleResolutionHelp" style="display:none"><small><strong>Dominant resolution mode:</strong> Each 3/4 bar plays Do–Mi–So–Te over the current dominant root, then La–Fa over the resolving tonic a fourth higher. The next bar begins on that new root. Bars per key and direction are automatic in this mode.</small></p>
+<p><small>Settings lock while running; stop and restart to change tempo, meter, or pattern. Audio continues only while this page is open and active.</small></p>
+</section>
+<section id="violinPage" hidden>
+<h2>Violin — Guided Scale Practice (Major & Pentatonic)</h2>
+<p><small>Play along with a reference melody and a steady tonic drone. No microphone required; use your ears to match pitch and tune against the drone.</small></p>
+<div class="options-panel" id="violinOptions">
+<label>Key: <select id="violinKey"></select></label>
+<label>Home tonic octave: <select id="violinOctave"><option value="3">3</option><option value="4" selected>4</option><option value="5">5</option></select></label>
+<label>Lowest note: <select id="violinLow"></select></label>
+<label>Highest note: <select id="violinHigh"></select></label><br>
+<label>Scale: <select id="violinScaleType"><option value="major">Major (7 notes)</option><option value="majorPent">Major pentatonic (1–2–3–5–6)</option><option value="minorPent">Minor pentatonic (1–♭3–4–5–♭7)</option></select></label><br>
+<label>Pattern: <select id="violinPattern"><option value="scale">Straight scale</option><option value="thirds">Diatonic thirds (Do–Mi–Re–Fa…)</option><option value="groups">Four-note groups (Do–Re–Mi–Do, Re–Mi–Fa–Re…)</option></select></label><br>
+<label>Tempo: <input id="violinTempo" type="number" min="30" max="240" value="70" style="width:80px"> BPM</label>
+<label>Meter: <select id="violinMeter"><option value="4">4/4</option><option value="3">3/4</option></select></label>
+<label>Beats per note: <select id="violinBeats"><option value="0.5">½</option><option value="1" selected>1</option><option value="2">2</option><option value="4">4</option></select></label><br>
+<label>Route: <select id="violinDirection"><option value="home" selected>Home tonic → high → low → home tonic</option><option value="both">Low → high → low</option><option value="up">Ascend only</option><option value="down">Descend only</option></select></label>
+<label>Repeat: <select id="violinRepeat"><option value="loop" selected>Loop continuously</option><option value="once">Once, then stop</option></select></label><br>
+<label>Drone: <select id="violinDrone"><option value="tonic" selected>Tonic</option><option value="fifth">Tonic + fifth</option><option value="off">Off</option></select></label>
+<label>Reference notes: <select id="violinGuide"><option value="on" selected>Play with me</option><option value="off">Off (audiate)</option></select></label><br>
+<label>Drone volume: <input type="range" id="violinDroneVolume" min="0" max="100" value="45"></label>
+<label>Note volume: <input type="range" id="violinNoteVolume" min="0" max="100" value="55"></label>
+</div>
+<p id="violinValidation" role="status" aria-live="polite"></p>
+<p><button id="violinStart" onclick="startViolin()">▶ Start</button><button id="violinStop" onclick="stopViolin()" disabled>■ Stop</button></p>
+<div class="diagnostics" aria-live="polite">
+<strong id="violinCurrent">Ready</strong><p id="violinNext">Choose a key and press Start.</p>
+<p id="violinProgress">—</p><div id="violinBeatsDisplay" style="display:flex;gap:9px;flex-wrap:wrap"></div>
+</div>
+<p><small>The drone hums continuously until Stop, without restarting at bar lines. Home-tonic routes begin and end on the chosen tonic, even when the lowest and highest notes are elsewhere. Major and minor pentatonic scales are rooted on the selected key, not relative major/minor. The reference notes follow equal temperament (A4 = 440 Hz). This version guides your ear; it does not analyze microphone input.</small></p>
+</section>
 <script>
 const AudioContextClass = window.AudioContext || window.webkitAudioContext;
 let ctx;
@@ -142,7 +198,7 @@ let selectedIntervals = [...presets.major];
 let correctNote = null, correctTune = null, givenCents = null, questionType = 'ascending', questionTuning = 'equal';
 let userNote = null, userTune = null, playbackGeneration = 0, answered = false;
 let intervalRoot = root;
-const appVersion='2.3';
+const appVersion='2.8';
 const historyKey='intonationTrainerQuestionHistoryV22';
 let questionHistory=[];
 try {const stored=JSON.parse(localStorage.getItem(historyKey));if(Array.isArray(stored))questionHistory=stored.slice(0,20);}catch(e){}
@@ -305,10 +361,16 @@ function showPage(page) {
   $('settingsPage').hidden = page !== 'settings';
   $('chordPage').hidden = page !== 'chord';
   $('tonalPage').hidden = page !== 'tonal';
+  $('circlePage').hidden = page !== 'circle';
+  $('violinPage').hidden = page !== 'violin';
+  if(page !== 'violin')stopViolin();
+  if(page !== 'circle')stopCircle();
   $('trainTab').setAttribute('aria-current', page === 'train' ? 'page' : 'false');
   
   $('chordTab').setAttribute('aria-current', page === 'chord' ? 'page' : 'false');
   $('tonalTab').setAttribute('aria-current', page === 'tonal' ? 'page' : 'false');
+  $('circleTab').setAttribute('aria-current', page === 'circle' ? 'page' : 'false');
+  $('violinTab').setAttribute('aria-current', page === 'violin' ? 'page' : 'false');
 }
 function buildControls() {
   renderNoteButtons();
@@ -571,6 +633,357 @@ function checkTonal(){
 }
 $('tonalMode').addEventListener('change',tonalBuildButtons);
 tonalBuildButtons();
+
+
+// Shared sustained-drone engine. Transport-specific code only chooses pitches and timing.
+// Oscillators survive bar lines; transitions are scheduled on the Web Audio clock.
+function createDroneManager(){
+ let voices=[],identity=null;
+ function silence(at,fade){
+  for(const voice of voices){
+   const {osc,gain,start,level,fadeStart,fadeEnd}=voice;
+   const t=Math.max(at,start);
+   try{
+    // Retain the scheduled gain at the transition time, including future transitions.
+    const held=t<=fadeStart?0.00001:t<fadeEnd?
+      0.00001+(level-0.00001)*(t-fadeStart)/(fadeEnd-fadeStart):level;
+    gain.gain.cancelScheduledValues(t);
+    gain.gain.setValueAtTime(Math.max(0.00001,held),t);
+    gain.gain.linearRampToValueAtTime(0.00001,t+fade);
+    osc.stop(t+fade+0.025);
+   }catch(e){}
+  }
+  voices=[];
+ }
+ return {
+  set(at,root,intervals,id,volume,{fade=0.16,attack=0.16}={}){
+   if(identity===id)return;
+   silence(at,fade);
+   identity=id;
+   if(!ctx||volume<=0||!intervals.length)return;
+   const level=0.105*volume/100/Math.sqrt(intervals.length);
+   for(const semitones of intervals){
+    const osc=ctx.createOscillator(),gain=ctx.createGain();
+    osc.type='triangle';osc.frequency.setValueAtTime(root*Math.pow(2,semitones/12),at);
+    gain.gain.setValueAtTime(0.00001,at);
+    gain.gain.linearRampToValueAtTime(level,at+attack);
+    osc.connect(gain);gain.connect(ctx.destination);osc.start(at);
+    voices.push({osc,gain,start:at,level,fadeStart:at,fadeEnd:at+attack});
+   }
+  },
+  stop(fade=0.22){
+   if(ctx)silence(ctx.currentTime,fade);
+   else voices=[];
+   identity=null;
+  }
+ };
+}
+const circleDrone=createDroneManager(),violinDrone=createDroneManager();
+
+// Circle practice: schedule against AudioContext.currentTime to avoid metronome drift.
+const circleNames=['C','G','D','A','E','B','F♯','D♭','A♭','E♭','B♭','F'];
+const circlePitchClasses=[0,7,2,9,4,11,6,1,8,3,10,5];
+const circleSyllables={do:0,ra:1,re:2,me:3,mi:4,fa:5,fi:6,so:7,le:8,la:9,te:10,ti:11};
+let circleTimer=null,circleNextTime=0,circleBeatIndex=0,circleSettings=null,circleDisplayTimers=[];
+
+function circleFrequency(midi){return 440*Math.pow(2,(midi-69)/12);}
+function circleRoot(index){
+ const pc=circlePitchClasses[index];
+ const center=circleSettings.register==='low'?48:circleSettings.register==='high'?72:60;
+ // Keep tonics within a tritone of the selected central pitch.
+ let midi=center+((pc-(center%12)+18)%12)-6;
+ return circleFrequency(midi);
+}
+function circleKeyIndex(bar){return (circleSettings.start+(circleSettings.direction==='up'?1:-1)*Math.floor(bar/circleSettings.bars)+1200)%12;}
+function circleScheduleClick(at,accent){
+ const osc=ctx.createOscillator(),g=ctx.createGain();osc.type='sine';
+ osc.frequency.setValueAtTime(accent?1200:850,at);
+ osc.frequency.exponentialRampToValueAtTime(accent?750:550,at+0.045);
+ g.gain.setValueAtTime(0.00001,at);g.gain.linearRampToValueAtTime(accent?0.14:0.09,at+0.003);
+ g.gain.exponentialRampToValueAtTime(0.00001,at+0.075);
+ osc.connect(g);g.connect(ctx.destination);osc.start(at);osc.stop(at+0.08);activeVoices.push({osc,gain:g});
+}
+// Maintain drone oscillators across measures; only crossfade when harmony actually changes.
+function circleSetDrone(at,root,intervals,identity){
+ circleDrone.set(at,root,intervals,identity,circleSettings.volume);
+}
+function circleStopDrone(){circleDrone.stop();}
+function circleScheduleBeat(at,beatNumber){
+ const s=circleSettings,bar=Math.floor(beatNumber/s.meter),beat=beatNumber%s.meter;
+ const index=circleKeyIndex(bar),hz=circleRoot(index),seconds=60/s.tempo;
+ const resolvingIndex=(index+11)%12, resolvingHz=circleRoot(resolvingIndex);
+ circleScheduleClick(at,beat===0);
+ if(beat===0){
+  if(s.resolution){
+   const dominantChord=s.drone==='triad'?[0,4,7,10]:s.drone==='fifth'?[0,7]:[0];
+   circleSetDrone(at,hz,dominantChord,'dominant-'+index+'-'+s.drone);
+  }else{
+   const notes=s.drone==='triad'?[0,4,7]:s.drone==='fifth'?[0,7]:[0];
+   circleSetDrone(at,hz,notes,'key-'+index+'-'+s.drone);
+  }
+ }
+ if(s.resolution && beat===2){
+  const tonicChord=s.drone==='triad'?[0,4,7]:s.drone==='fifth'?[0,7]:[0];
+  circleSetDrone(at,resolvingHz,tonicChord,'resolution-'+resolvingIndex+'-'+s.drone);
+ }
+ if(s.guide && s.pattern.length){
+  for(let sub=0;sub<s.subdivision;sub++){
+   const patternBar=bar%s.patternBars;
+   const token=s.pattern[patternBar*s.meter*s.subdivision+beat*s.subdivision+sub];
+   if(token!==null && s.guideVolume>0){
+    // Resolution syllables are relative to the outgoing dominant root.
+    const f=hz*Math.pow(2,token/12),noteSeconds=seconds/s.subdivision;
+    playTone(f,at+sub*noteSeconds,Math.min(10,noteSeconds*0.88),0.15*s.guideVolume/100,'sine');
+   }
+  }
+ }
+ const delay=Math.max(0,(at-ctx.currentTime)*1000);
+ const timeout=setTimeout(()=>{
+  if(!circleSettings)return;
+  const nextIndex=circleKeyIndex(bar+s.bars-(bar%s.bars));
+  $('circleKey').textContent=s.resolution?('Dominant: '+circleNames[index]+'7 → '+circleNames[resolvingIndex]):('Current key: '+circleNames[index]);
+  $('circleStatus').textContent=`Bar ${bar+1} · Beat ${beat+1}/${s.meter} · ${s.tempo} BPM`;
+  $('circleNext').textContent=s.resolution?('Next: '+circleNames[resolvingIndex]+'7 → '+circleNames[(resolvingIndex+11)%12]):('Next key: '+circleNames[nextIndex]);
+  $('circleBeats').innerHTML=Array.from({length:s.meter},(_,i)=>`<span style="display:inline-flex;align-items:center;justify-content:center;width:34px;height:34px;border:1px solid var(--border);border-radius:50%;background:${i===beat?'#335c76':'#242a33'}">${i+1}</span>`).join('');
+ },delay);
+ circleDisplayTimers.push(timeout);
+}
+function circleTick(){
+ if(!circleSettings||!ctx)return;
+ while(circleNextTime<ctx.currentTime+0.12){
+  circleScheduleBeat(circleNextTime,circleBeatIndex++);
+  circleNextTime+=60/circleSettings.tempo;
+ }
+ // Drop timers already fired from tracking; at most a few remain pending.
+ if(circleDisplayTimers.length>20)circleDisplayTimers=circleDisplayTimers.slice(-10);
+}
+function circlePatternTokens(){return $('circlePattern').value.split(',').map(x=>x.trim().toLowerCase());}
+const circlePresets={
+ 'warmup-154321':{name:'Descending 1–5–4–3–2–1',notes:'Do So Fa Mi Re Do',meter:3,subdivision:2},
+ 'triad':{name:'Major arpeggio 1–3–5–3–1',notes:'Do Mi So Mi Do',meter:3,subdivision:2},
+ 'dominant':{name:'Dominant seventh 1–3–5–♭7–5–3–1',notes:'Do Mi So Te So Mi Do',meter:4,subdivision:2},
+ 'pentatonic':{name:'Pentatonic 1–2–3–5–6–5–3–2–1',notes:'Do Re Mi So La So Mi Re Do',meter:3,subdivision:2},
+ 'thirds':{name:'Diatonic thirds 1–3–2–4–3–5–4–6–5–7–1',notes:'Do Mi Re Fa Mi So Fa La So Ti Do',meter:3,subdivision:2},
+ 'seventh':{name:'Major seventh 1–3–5–7–8–7–5–3–1',notes:'Do Mi So Ti Do Ti So Mi Do',meter:3,subdivision:2},
+ 'scale':{name:'Major scale up and down',notes:'Do Re Mi Fa So La Ti Do Ti La So Fa Mi Re Do',meter:4,subdivision:2},
+ 'pentascale':{name:'Five-note scale up and down',notes:'Do Re Mi Fa So Fa Mi Re Do',meter:3,subdivision:2},
+ 'dominant-retarget':{name:'Dominant retarget: Do–Mi–So–Ti–Re–So',notes:'Do Mi So Ti Re So',meter:3,subdivision:2},
+ 'resolution':{name:'Dominant resolution → circle of fourths (C7 → F7 → B♭7 …)',notes:'Do Mi So Te La Fa',meter:3,subdivision:2,special:true},
+ 'descending-5721':{name:'Descending 5–7–2–1',notes:'So Ti Re Do',meter:4,subdivision:1},
+ 'mixolydian':{name:'Mixolydian scale',notes:'Do Re Mi Fa So La Te Do',meter:4,subdivision:2},
+ 'minor':{name:'Natural minor scale',notes:'Do Re Me Fa So Le Te Do',meter:4,subdivision:2},
+ 'ladder':{name:'Cumulative ladder (short)',notes:'Do Re Do Re Mi Re Do Re Mi Fa Mi Re Do',meter:4,subdivision:2}
+};
+for(const [id,preset] of Object.entries(circlePresets)){
+ const option=document.createElement('option');option.value=id;option.textContent=preset.name;$('circlePreset').appendChild(option);
+}
+function circleApplyPreset(){
+ const p=circlePresets[$('circlePreset').value];if(!p)return;
+ $('circleMeter').value=String(p.meter);$('circleSubdivision').value=String(p.subdivision);
+ const tokens=p.notes.split(' '),perBar=p.meter*p.subdivision;
+ const bars=Math.ceil(tokens.length/perBar);
+ $('circlePattern').value=[...tokens,...Array(bars*perBar-tokens.length).fill('-')].join(', ');
+ $('circleBars').value=String(p.special?1:Math.max(bars,Number($('circleBars').value)));
+ if(p.special)$('circleDirection').value='down';
+ $('circleGuide').checked=true;circleUpdateResolutionUI();circleUpdatePatternFeedback();
+}
+function circleUpdateResolutionUI(){
+ const special=$('circlePreset').value==='resolution';
+ $('circleBars').disabled=special;$('circleDirection').disabled=special;
+ $('circleResolutionHelp').style.display=special?'block':'none';
+ if(special){$('circleBars').value='1';$('circleDirection').value='down';}
+}
+$('circlePreset').addEventListener('change',circleApplyPreset);
+$('circlePattern').addEventListener('input',()=>{$('circlePreset').value='custom';circleUpdateResolutionUI();});
+$('circleMeter').addEventListener('change',()=>{$('circlePreset').value='custom';circleUpdateResolutionUI();});
+$('circleSubdivision').addEventListener('change',()=>{$('circlePreset').value='custom';circleUpdateResolutionUI();});
+function circlePatternError(){
+ const raw=circlePatternTokens(),perBar=Number($('circleMeter').value)*Number($('circleSubdivision').value);
+ if(raw.some(x=>x!=='-'&&!Object.hasOwn(circleSyllables,x)))return 'Unrecognized syllable. Use Do, Ra, Re, Me, Mi, Fa, Fi, So, Le, La, Te, Ti, or -.';
+ if(!raw.length||raw.length%perBar!==0)return `Pattern has ${raw.length} slots; each full bar needs ${perBar}. Add rests (-) to complete the last bar.`;
+ if(raw.length/perBar>64)return 'Pattern cannot exceed 64 bars.';
+ return '';
+}
+function circleUpdatePatternFeedback(){
+ const error=circlePatternError(),required=Number($('circleMeter').value)*Number($('circleSubdivision').value);
+ const el=$('circlePatternFeedback');
+ el.textContent=error || `✓ Valid: ${circlePatternTokens().length/required} bar(s), ${circlePatternTokens().length} slots. Pattern repeats at its full length.`;
+ el.style.color=error?'#ffb4ab':'#a5e3c4';
+ $('circlePattern').setAttribute('aria-invalid',error?'true':'false');
+ $('circleStartButton').disabled=!!($('circleGuide').checked && error) || !!circleSettings;
+}
+function circleFitPattern(){
+ const required=Number($('circleMeter').value)*Number($('circleSubdivision').value);
+ const raw=circlePatternTokens().filter(x=>x==='-'||Object.hasOwn(circleSyllables,x));
+ const fallback=['do','re','mi','fa','so','la','ti','do'];
+ $('circlePattern').value=Array.from({length:Math.max(required,Math.ceil(raw.length/required)*required)},(_,i)=>raw[i]||'-').map(x=>x==='-'?'-':x[0].toUpperCase()+x.slice(1)).join(', ');
+ circleUpdatePatternFeedback();
+}
+['circleMeter','circleSubdivision','circlePattern','circleGuide'].forEach(id=>$(id).addEventListener(id==='circlePattern'?'input':'change',circleUpdatePatternFeedback));
+circleUpdateResolutionUI();circleUpdatePatternFeedback();
+function startCircle(){
+ stopCircle();
+ const tempo=Number($('circleTempo').value),bars=Number($('circleBars').value);
+ if(!Number.isFinite(tempo)||tempo<5||tempo>240||!Number.isInteger(bars)||bars<1||bars>64){alert('Use 5–240 BPM and 1–64 whole bars per key.');return;}
+ const raw=circlePatternTokens();
+ const resolution=$('circlePreset').value==='resolution';
+ if(resolution && (Number($('circleMeter').value)!==3 || Number($('circleSubdivision').value)!==2 || raw.join(' ')!=='do mi so te la fa')){alert('Select the Dominant resolution preset again to restore its six eighth-note pattern.');return;}
+ if($('circleGuide').checked && circlePatternError()){alert(circlePatternError());circleUpdatePatternFeedback();return;}
+ circleSettings={tempo,bars,meter:Number($('circleMeter').value),direction:$('circleDirection').value,start:Number($('circleStart').value),register:$('circleRegister').value,drone:$('circleDrone').value,volume:Number($('circleVolume').value),guide:$('circleGuide').checked,subdivision:Number($('circleSubdivision').value),guideVolume:Number($('circleGuideVolume').value),pattern:raw.map(x=>x==='-'?null:circleSyllables[x]),patternBars:raw.length/(Number($('circleMeter').value)*Number($('circleSubdivision').value)),resolution};
+ audio();stopPlayback();circleBeatIndex=0;circleNextTime=ctx.currentTime+0.08;
+ $('circleStartButton').disabled=true;$('circleStopButton').disabled=false;
+ document.querySelectorAll('#circleOptions input,#circleOptions select').forEach(el=>el.disabled=true);
+ circleTick();circleTimer=setInterval(circleTick,25);
+}
+function stopCircle(){
+ if(circleTimer!==null){clearInterval(circleTimer);circleTimer=null;}
+ circleDisplayTimers.forEach(clearTimeout);circleDisplayTimers=[];
+ if(circleSettings){circleStopDrone();stopPlayback();circleSettings=null;}
+ const start=$('circleStartButton'),stop=$('circleStopButton');
+ if(start)start.disabled=false;if(stop)stop.disabled=true;
+ document.querySelectorAll('#circleOptions input,#circleOptions select').forEach(el=>el.disabled=false);
+ circleUpdateResolutionUI();circleUpdatePatternFeedback();
+}
+document.addEventListener('visibilitychange',()=>{if(document.hidden){stopCircle();stopViolin();}});
+
+
+// Violin practice: independent AudioContext-clock transport, shared oscillator engine.
+const violinKeys=[['C',0],['C♯ / D♭',1],['D',2],['E♭',3],['E',4],['F',5],['F♯',6],['G',7],['A♭',8],['A',9],['B♭',10],['B',11]];
+const violinScaleSteps=[0,2,4,5,7,9,11];
+const violinScaleTypes={major:violinScaleSteps,majorPent:[0,2,4,7,9],minorPent:[0,3,5,7,10]};
+let violinTimer=null,violinSettings=null,violinNextTime=0,violinSlot=0,violinTimers=[];
+violinKeys.forEach(([name,pc])=>{const o=document.createElement('option');o.value=pc;o.textContent=name;$('violinKey').appendChild(o);});
+$('violinKey').value='7'; // G major.
+for(let m=55;m<=100;m++){
+ for(const id of ['violinLow','violinHigh']){
+  const option=document.createElement('option');option.value=m;option.textContent=violinMidiName(m);$(id).appendChild(option);
+ }
+}
+$('violinLow').value='67'; // G4
+$('violinHigh').value='83'; // B5, reachable in first position on the E string.
+$('violinKey').value='2'; // D major: D4 → B5 → G3 → D4.
+$('violinLow').value='55'; // Open G string.
+function violinMidiName(m){
+ const chroma=['C','C♯','D','E♭','E','F','F♯','G','G♯','A','B♭','B'];
+ return chroma[m%12]+(Math.floor(m/12)-1);
+}
+// Pure music-theory helpers: independently testable without the DOM or audio hardware.
+function violinScaleInRange(pc,low,high,steps=violinScaleSteps){
+ const allowed=new Set(steps.map(step=>(pc+step)%12));
+ const result=[];
+ for(let midi=low;midi<=high;midi++)if(allowed.has(midi%12))result.push(midi);
+ return result;
+}
+function violinPatternPath(path,pattern){
+ if(pattern==='scale')return [...path];
+ const result=[];
+ // Apply each motif to the actual travel direction, not merely to an ascending list.
+ for(let i=0;i+2<path.length;i++){
+  if(pattern==='thirds')result.push(path[i],path[i+2]);
+  else if(pattern==='groups')result.push(path[i],path[i+1],path[i+2],path[i]);
+ }
+ // End each run at its actual endpoint so transitions remain clearly audible.
+ if(path.length&&result.at(-1)!==path.at(-1))result.push(path.at(-1));
+ return result;
+}
+function violinRoute(scale,home,direction,pattern){
+ const homeIndex=scale.indexOf(home);
+ if(direction==='home'){
+  if(homeIndex<0)return [];
+  // E.g. D4 → B5 → G3 → D4. Don't duplicate endpoints at turns.
+  const ascend=scale.slice(homeIndex);
+  const descend=scale.slice(0,-1).reverse();
+  const returnHome=scale.slice(1,homeIndex+1);
+  const legs=[ascend,descend,returnHome].filter(x=>x.length);
+  if(pattern==='scale')return legs.flat();
+  return legs.flatMap((leg,i)=>violinPatternPath(i===0?leg:[scale[i===1?scale.length-1:0],...leg],pattern).slice(i===0?0:1));
+ }
+ const up=violinPatternPath(scale,pattern);
+ if(direction==='up')return up;
+ if(direction==='down')return violinPatternPath([...scale].reverse(),pattern);
+ return up.concat(violinPatternPath([...scale].reverse(),pattern).slice(1));
+}
+function violinBuildSequence(){
+ const pc=Number($('violinKey').value),low=Number($('violinLow').value),high=Number($('violinHigh').value);
+ const home=12*(Number($('violinOctave').value)+1)+pc;
+ const scale=violinScaleInRange(pc,low,high,violinScaleTypes[$('violinScaleType').value]||violinScaleSteps);
+ const notes=violinRoute(scale,home,$('violinDirection').value,$('violinPattern').value);
+ return {tonic:home,notes,scale,home};
+}
+function violinValidate(){
+ const tempo=Number($('violinTempo').value),beats=Number($('violinBeats').value),low=Number($('violinLow').value),high=Number($('violinHigh').value);
+ const {notes,scale,home}=violinBuildSequence();
+ let error='';
+ if(!Number.isFinite(tempo)||tempo<30||tempo>240)error='Tempo must be between 30 and 240 BPM.';
+ else if(low>=high)error='Highest note must be above lowest note.';
+ else if($('violinDirection').value==='home'&&(home<low||home>high))error='The home tonic must fall inside your selected range; change its octave or the range.';
+ else if(scale.length<3||notes.length===0)error='Choose a wider range containing at least three notes of this key.';
+ else if(![0.5,1,2,4].includes(beats))error='Choose a valid number of beats per note.';
+ $('violinValidation').textContent=error||`✓ ${notes.length} notes · starts ${violinMidiName(notes[0])}, ends ${violinMidiName(notes.at(-1))} · ${notes.length*beats} beats per cycle`;
+ $('violinStart').disabled=!!error||!!violinSettings;
+ return !error;
+}
+['violinScaleType','violinKey','violinLow','violinHigh','violinOctave','violinDirection','violinPattern','violinTempo','violinBeats','violinMeter'].forEach(id=>$(id).addEventListener('change',violinValidate));
+function violinStartDrone(s,at){
+ if(s.drone==='off'||s.droneVolume<=0)return;
+ const intervals=s.drone==='fifth'?[0,7]:[0];
+ violinDrone.set(at,circleFrequency(s.tonic-12),intervals,
+   `violin-${s.tonic}-${s.drone}`,s.droneVolume,{attack:0.45});
+}
+function violinStopDrone(){violinDrone.stop(0.45);}
+function violinSchedule(at,slot){
+ const s=violinSettings;
+ const beatSeconds=60/s.tempo,stepsPerBeat=s.beats===0.5?2:1;
+ const noteIndex=Math.floor(slot/(s.beats*stepsPerBeat));
+ if(s.repeat==='once'&&noteIndex>=s.notes.length){
+  const timeout=setTimeout(()=>{if(violinSettings===s)stopViolin();},Math.max(0,(at-ctx.currentTime)*1000));
+  violinTimers.push(timeout);return false;
+ }
+ const currentIndex=noteIndex%s.notes.length;
+ const note=s.notes[currentIndex],beatPosition=slot/stepsPerBeat;
+ const isBeat=slot%stepsPerBeat===0;
+ if(isBeat)circleScheduleClick(at,Math.round(beatPosition)%s.meter===0);
+ if(s.guide&&slot%(s.beats*stepsPerBeat)===0&&s.noteVolume>0){
+  playTone(circleFrequency(note),at,Math.max(0.12,s.beats*beatSeconds*0.88),0.14*s.noteVolume/100,'sine');
+ }
+ const timeout=setTimeout(()=>{
+  if(violinSettings!==s)return;
+  $('violinCurrent').textContent='Play: '+violinMidiName(note)+' ('+circleFrequency(note).toFixed(1)+' Hz)';
+  const next=s.notes[(currentIndex+1)%s.notes.length];
+  $('violinNext').textContent='Next: '+violinMidiName(next);
+  $('violinProgress').textContent=`Note ${currentIndex+1}/${s.notes.length} · Beat ${Math.floor(beatPosition)%s.meter+1}/${s.meter}`;
+  $('violinBeatsDisplay').innerHTML=Array.from({length:s.meter},(_,i)=>`<span style="display:inline-flex;align-items:center;justify-content:center;width:34px;height:34px;border:1px solid var(--border);border-radius:50%;background:${i===Math.floor(beatPosition)%s.meter?'#335c76':'#242a33'}">${i+1}</span>`).join('');
+ },Math.max(0,(at-ctx.currentTime)*1000));
+ violinTimers.push(timeout);
+ return true;
+}
+function violinTick(){
+ if(!violinSettings||!ctx)return;
+ const s=violinSettings,steps=s.beats===0.5?2:1;
+ while(violinNextTime<ctx.currentTime+0.12){
+  if(!violinSchedule(violinNextTime,violinSlot))break;
+  violinSlot++;violinNextTime+=60/s.tempo/steps;
+ }
+ if(violinTimers.length>40)violinTimers=violinTimers.slice(-20);
+}
+function startViolin(){
+ stopViolin();if(!violinValidate())return;
+ const {tonic,notes}=violinBuildSequence();
+ violinSettings={tonic,notes,tempo:Number($('violinTempo').value),meter:Number($('violinMeter').value),beats:Number($('violinBeats').value),repeat:$('violinRepeat').value,drone:$('violinDrone').value,guide:$('violinGuide').value==='on',droneVolume:Number($('violinDroneVolume').value),noteVolume:Number($('violinNoteVolume').value)};
+ audio();stopPlayback();violinSlot=0;violinNextTime=ctx.currentTime+0.09;violinStartDrone(violinSettings,violinNextTime);
+ document.querySelectorAll('#violinOptions input,#violinOptions select').forEach(el=>el.disabled=true);
+ $('violinStart').disabled=true;$('violinStop').disabled=false;
+ violinTick();violinTimer=setInterval(violinTick,25);
+}
+function stopViolin(){
+ if(violinTimer!==null){clearInterval(violinTimer);violinTimer=null;}
+ violinTimers.forEach(clearTimeout);violinTimers=[];
+ if(violinSettings){violinSettings=null;stopPlayback();}
+ violinStopDrone();
+ document.querySelectorAll('#violinOptions input,#violinOptions select').forEach(el=>el.disabled=false);
+ $('violinStop').disabled=true;violinValidate();
+}
+violinValidate();
 
 restoreOptions();
 renderStats();
