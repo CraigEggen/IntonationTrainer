@@ -970,7 +970,30 @@ function startViolin(){
  stopViolin();if(!violinValidate())return;
  const {tonic,notes}=violinBuildSequence();
  violinSettings={tonic,notes,tempo:Number($('violinTempo').value),meter:Number($('violinMeter').value),beats:Number($('violinBeats').value),repeat:$('violinRepeat').value,drone:$('violinDrone').value,guide:$('violinGuide').value==='on',droneVolume:Number($('violinDroneVolume').value),noteVolume:Number($('violinNoteVolume').value)};
- audio();stopPlayback();violinSlot=0;violinNextTime=ctx.currentTime+0.09;violinStartDrone(violinSettings,violinNextTime);
+ audio();stopPlayback();violinSlot=0;
+ const s=violinSettings,beatSeconds=60/s.tempo;
+ const cueTime=ctx.currentTime+0.12;
+ // Give the player a pitch reference, then one complete bar of count-in clicks.
+ playTone(circleFrequency(notes[0]),cueTime,Math.max(0.2,beatSeconds*0.8),0.14*Math.max(0.4,s.noteVolume/100),'sine');
+ violinNextTime=cueTime+(s.meter+1)*beatSeconds;
+ violinStartDrone(s,violinNextTime);
+ const cueTimer=setTimeout(()=>{if(violinSettings===s){
+  $('violinCurrent').textContent='Starting note: '+violinMidiName(notes[0]);
+  $('violinNext').textContent='Listen, then count in…';
+  $('violinProgress').textContent='Starting pitch';
+ }},Math.max(0,(cueTime-ctx.currentTime)*1000));
+ violinTimers.push(cueTimer);
+ for(let i=0;i<s.meter;i++){
+  const at=cueTime+(i+1)*beatSeconds;
+  circleScheduleClick(at,i===0);
+  const countTimer=setTimeout(()=>{if(violinSettings===s){
+   $('violinCurrent').textContent='Count in: '+(i+1)+' / '+s.meter;
+   $('violinNext').textContent='First note: '+violinMidiName(notes[0]);
+   $('violinProgress').textContent='Get your bow ready';
+   $('violinBeatsDisplay').innerHTML=Array.from({length:s.meter},(_,j)=>'<span style="display:inline-flex;align-items:center;justify-content:center;width:34px;height:34px;border:1px solid var(--border);border-radius:50%;background:'+(j===i?'#335c76':'#242a33')+'">'+(j+1)+'</span>').join('');
+  }},Math.max(0,(at-ctx.currentTime)*1000));
+  violinTimers.push(countTimer);
+ }
  document.querySelectorAll('#violinOptions input,#violinOptions select').forEach(el=>el.disabled=true);
  $('violinStart').disabled=true;$('violinStop').disabled=false;
  violinTick();violinTimer=setInterval(violinTick,25);
