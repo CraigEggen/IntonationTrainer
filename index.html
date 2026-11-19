@@ -865,6 +865,34 @@ $('violinKey').value='2'; // D major: D4 → B5 → G3 → D4.
 $('violinLow').value='55'; // Open G string.
 function violinMidiName(m){
  const chroma=['C','C♯','D','E♭','E','F','F♯','G','G♯','A','B♭','B'];
+ // Spell diatonic notes according to the selected major key, not a fixed
+ // chromatic list (e.g. E major has D♯, not E♭).
+ const key=Number($('violinKey')?.value);
+ const spellings={
+  0:['C','D','E','F','G','A','B'],
+  1:['D♭','E♭','F','G♭','A♭','B♭','C'],
+  2:['D','E','F♯','G','A','B','C♯'],
+  3:['E♭','F','G','A♭','B♭','C','D'],
+  4:['E','F♯','G♯','A','B','C♯','D♯'],
+  5:['F','G','A','B♭','C','D','E'],
+  6:['F♯','G♯','A♯','B','C♯','D♯','E♯'],
+  7:['G','A','B','C','D','E','F♯'],
+  8:['A♭','B♭','C','D♭','E♭','F','G'],
+  9:['A','B','C♯','D','E','F♯','G♯'],
+  10:['B♭','C','D','E♭','F','G','A'],
+  11:['B','C♯','D♯','E','F♯','G♯','A♯']
+ };
+ const names=spellings[key];
+ if(names){
+  const steps=violinScaleSteps;
+  const degree=steps.findIndex(step=>(key+step)%12===m%12);
+  if(degree>=0){
+   const name=names[degree];
+   // A written B♯ or E♯ belongs to the preceding numbered octave.
+   const octave=Math.floor(m/12)-1-(name.startsWith('B♯')?1:0);
+   return name+octave;
+  }
+ }
  return chroma[m%12]+(Math.floor(m/12)-1);
 }
 // Pure music-theory helpers: independently testable without the DOM or audio hardware.
