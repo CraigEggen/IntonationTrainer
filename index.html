@@ -163,6 +163,9 @@ small {color:var(--muted);}
 <label>Meter: <select id="violinMeter"><option value="4">4/4</option><option value="3">3/4</option></select></label>
 <label>Beats per note: <select id="violinBeats"><option value="0.5">½</option><option value="1" selected>1</option><option value="2">2</option><option value="4">4</option></select></label><br>
 <label>Route: <select id="violinDirection"><option value="home" selected>Home tonic → high → low → home tonic</option><option value="both">Low → high → low</option><option value="up">Ascend only</option><option value="down">Descend only</option></select></label>
+<label>Auto-advance: <select id="violinAdvance"><option value="off" selected>Off — stay in key</option><option value="fifths">Circle of fifths</option><option value="fourths">Circle of fourths</option><option value="chromatic">Chromatic</option></select></label><br>
+<label>Routes per key: <select id="violinCycles"><option value="1">1</option><option value="2" selected>2</option><option value="3">3</option><option value="4">4</option></select></label>
+<label>Transition pause: <select id="violinPause"><option value="0">0 beats</option><option value="2">2 beats</option><option value="4" selected>4 beats</option><option value="8">8 beats</option></select></label><br>
 <label>Repeat: <select id="violinRepeat"><option value="loop" selected>Loop continuously</option><option value="once">Once, then stop</option></select></label><br>
 <label>Drone: <select id="violinDrone"><option value="tonic" selected>Tonic</option><option value="fifth">Tonic + fifth</option><option value="off">Off</option></select></label>
 <label>Reference notes: <select id="violinGuide"><option value="on" selected>Play with me</option><option value="off">Off (audiate)</option></select></label><br>
@@ -918,9 +921,9 @@ function violinRoute(scale,home,direction,pattern){
  const homeIndex=scale.indexOf(home);
  if(direction==='home'){
   if(homeIndex<0)return [];
-  // E.g. D4 → B5 → G3 → D4. Don't duplicate endpoints at turns.
+  // Repeat the top note at the reversal to make bowing direction changes natural.
   const ascend=scale.slice(homeIndex);
-  const descend=scale.slice(0,-1).reverse();
+  const descend=[...scale].reverse();
   const returnHome=scale.slice(1,homeIndex+1);
   const legs=[ascend,descend,returnHome].filter(x=>x.length);
   if(pattern==='scale')return legs.flat();
@@ -929,7 +932,7 @@ function violinRoute(scale,home,direction,pattern){
  const up=violinPatternPath(scale,pattern);
  if(direction==='up')return up;
  if(direction==='down')return violinPatternPath([...scale].reverse(),pattern);
- return up.concat(violinPatternPath([...scale].reverse(),pattern).slice(1));
+ return up.concat(violinPatternPath([...scale].reverse(),pattern));
 }
 function violinBuildSequence(){
  const pc=Number($('violinKey').value),low=Number($('violinLow').value),high=Number($('violinHigh').value);
@@ -951,7 +954,7 @@ function violinValidate(){
  $('violinStart').disabled=!!error||!!violinSettings;
  return !error;
 }
-['violinScaleType','violinKey','violinLow','violinHigh','violinOctave','violinDirection','violinPattern','violinTempo','violinBeats','violinMeter'].forEach(id=>$(id).addEventListener('change',violinValidate));
+['violinScaleType','violinKey','violinLow','violinHigh','violinOctave','violinDirection','violinPattern','violinTempo','violinBeats','violinMeter','violinAdvance','violinCycles','violinPause'].forEach(id=>$(id).addEventListener('change',violinValidate));
 function violinStartDrone(s,at){
  if(s.drone==='off'||s.droneVolume<=0)return;
  const intervals=s.drone==='fifth'?[0,7]:[0];
@@ -959,31 +962,66 @@ function violinStartDrone(s,at){
    `violin-${s.tonic}-${s.drone}`,s.droneVolume,{attack:0.45});
 }
 function violinStopDrone(){violinDrone.stop(0.45);}
+function violinKeySequence(s,index){
+ const pc=(s.startPc+index*s.advanceStep)%12;
+ const scale=violinScaleInRange(pc,s.low,s.high,violinScaleTypes[s.scaleType]||violinScaleSteps);
+ // Prefer the selected octave; for edge keys, choose an in-range tonic.
+ let home=12*(s.octave+1)+pc;
+ if(!scale.includes(home))home=scale.find(n=>n%12===pc)??home;
+ const notes=violinRoute(scale,home,s.direction,s.pattern);
+ return {pc,home,notes};
+}
 function violinSchedule(at,slot){
  const s=violinSettings;
- const beatSeconds=60/s.tempo,stepsPerBeat=s.beats===0.5?2:1;
- const noteIndex=Math.floor(slot/(s.beats*stepsPerBeat));
- if(s.repeat==='once'&&noteIndex>=s.notes.length){
+ const steps=s.beats===0.5?2:1,beatSeconds=60/s.tempo;
+ const slotsPerNote=s.beats*steps;
+ const routeSlots=s.notes.length*slotsPerNote;
+ const keySlots=routeSlots*s.cycles+s.pause*steps;
+ const keyIndex=s.advanceStep===0?0:Math.floor(slot/keySlots);
+ const keySlot=s.advanceStep===0?slot:slot%keySlots;
+ const routeSlot=s.advanceStep===0?slot%routeSlots:keySlot%routeSlots;
+ const inTransition=s.advanceStep!==0&&keySlot>=routeSlots*s.cycles;
+ if(s.repeat==='once' && (s.advanceStep===0?slot>=routeSlots:slot>=keySlots*12)){
   const timeout=setTimeout(()=>{if(violinSettings===s)stopViolin();},Math.max(0,(at-ctx.currentTime)*1000));
   violinTimers.push(timeout);return false;
  }
- const currentIndex=noteIndex%s.notes.length;
- const note=s.notes[currentIndex],beatPosition=slot/stepsPerBeat;
- const isBeat=slot%stepsPerBeat===0;
- if(isBeat)circleScheduleClick(at,Math.round(beatPosition)%s.meter===0);
- if(s.guide&&slot%(s.beats*stepsPerBeat)===0&&s.noteVolume>0){
-  playTone(circleFrequency(note),at,Math.max(0.12,s.beats*beatSeconds*0.88),0.14*s.noteVolume/100,'sine');
+ if(s.advanceStep!==0 && keySlot===0){
+  const seq=violinKeySequence(s,keyIndex);
+  if(!seq.notes.length)return false;
+  s.currentNotes=seq.notes;s.currentPc=seq.pc;
+  if(s.drone!=='off'&&s.droneVolume>0)violinDrone.set(at,circleFrequency(seq.home-12),s.drone==='fifth'?[0,7]:[0],
+   'violin-'+seq.home+'-'+s.drone,s.droneVolume,{attack:0.45});
  }
+ const currentNotes=s.advanceStep===0?s.notes:s.currentNotes;
+ const currentIndex=Math.floor(routeSlot/slotsPerNote);
+ const note=currentNotes[currentIndex];
+ const isBeat=slot%steps===0;
+ if(isBeat)circleScheduleClick(at,Math.round(slot/steps)%s.meter===0);
+ if(inTransition){
+  if(keySlot===routeSlots*s.cycles){
+   const next=violinKeySequence(s,keyIndex+1);
+   if(next.notes.length)playTone(circleFrequency(next.notes[0]),at,Math.max(0.2,beatSeconds*0.8),0.14*Math.max(0.4,s.noteVolume/100),'sine');
+  }
+  const timeout=setTimeout(()=>{
+   if(violinSettings!==s)return;
+   const next=violinKeySequence(s,keyIndex+1);
+   $('violinCurrent').textContent='Next key: '+violinMidiName(next.home);
+   $('violinNext').textContent='Starting note: '+violinMidiName(next.notes[0])+' · prepare for next route';
+   $('violinProgress').textContent='Transition · '+Math.floor((keySlot-routeSlots*s.cycles)/steps+1)+' / '+s.pause+' beats';
+  },Math.max(0,(at-ctx.currentTime)*1000));
+  violinTimers.push(timeout);return true;
+ }
+ if(s.guide&&routeSlot%slotsPerNote===0&&s.noteVolume>0)
+  playTone(circleFrequency(note),at,Math.max(0.12,s.beats*beatSeconds*0.88),0.14*s.noteVolume/100,'sine');
  const timeout=setTimeout(()=>{
   if(violinSettings!==s)return;
   $('violinCurrent').textContent='Play: '+violinMidiName(note)+' ('+circleFrequency(note).toFixed(1)+' Hz)';
-  const next=s.notes[(currentIndex+1)%s.notes.length];
+  const next=currentNotes[(currentIndex+1)%currentNotes.length];
   $('violinNext').textContent='Next: '+violinMidiName(next);
-  $('violinProgress').textContent=`Note ${currentIndex+1}/${s.notes.length} · Beat ${Math.floor(beatPosition)%s.meter+1}/${s.meter}`;
-  $('violinBeatsDisplay').innerHTML=Array.from({length:s.meter},(_,i)=>`<span style="display:inline-flex;align-items:center;justify-content:center;width:34px;height:34px;border:1px solid var(--border);border-radius:50%;background:${i===Math.floor(beatPosition)%s.meter?'#335c76':'#242a33'}">${i+1}</span>`).join('');
+  $('violinProgress').textContent='Key '+(keyIndex%12+1)+'/12 · Route '+(Math.floor(keySlot/routeSlots)+1)+'/'+s.cycles+' · Note '+(currentIndex+1)+'/'+currentNotes.length;
+  $('violinBeatsDisplay').innerHTML=Array.from({length:s.meter},(_,i)=>'<span style="display:inline-flex;align-items:center;justify-content:center;width:34px;height:34px;border:1px solid var(--border);border-radius:50%;background:'+(i===Math.floor(slot/steps)%s.meter?'#335c76':'#242a33')+'">'+(i+1)+'</span>').join('');
  },Math.max(0,(at-ctx.currentTime)*1000));
- violinTimers.push(timeout);
- return true;
+ violinTimers.push(timeout);return true;
 }
 function violinTick(){
  if(!violinSettings||!ctx)return;
@@ -996,15 +1034,17 @@ function violinTick(){
 }
 function startViolin(){
  stopViolin();if(!violinValidate())return;
+ if($('violinAdvance').value!=='off'){$('violinLow').value='55';$('violinHigh').value='83';}
  const {tonic,notes}=violinBuildSequence();
- violinSettings={tonic,notes,tempo:Number($('violinTempo').value),meter:Number($('violinMeter').value),beats:Number($('violinBeats').value),repeat:$('violinRepeat').value,drone:$('violinDrone').value,guide:$('violinGuide').value==='on',droneVolume:Number($('violinDroneVolume').value),noteVolume:Number($('violinNoteVolume').value)};
+ violinSettings={tonic,notes,tempo:Number($('violinTempo').value),meter:Number($('violinMeter').value),beats:Number($('violinBeats').value),repeat:$('violinRepeat').value,drone:$('violinDrone').value,guide:$('violinGuide').value==='on',droneVolume:Number($('violinDroneVolume').value),noteVolume:Number($('violinNoteVolume').value),startPc:Number($('violinKey').value),low:55,high:83,octave:Number($('violinOctave').value),direction:$('violinDirection').value,pattern:$('violinPattern').value,scaleType:$('violinScaleType').value,advanceStep:({off:0,fifths:7,fourths:5,chromatic:1})[$('violinAdvance').value],cycles:Number($('violinCycles').value),pause:Number($('violinPause').value)};
  audio();stopPlayback();violinSlot=0;
  const s=violinSettings,beatSeconds=60/s.tempo;
+ if(s.advanceStep!==0){s.notes=violinKeySequence(s,0).notes;s.currentNotes=s.notes;}
  const cueTime=ctx.currentTime+0.12;
  // Give the player a pitch reference, then one complete bar of count-in clicks.
  playTone(circleFrequency(notes[0]),cueTime,Math.max(0.2,beatSeconds*0.8),0.14*Math.max(0.4,s.noteVolume/100),'sine');
  violinNextTime=cueTime+(s.meter+1)*beatSeconds;
- violinStartDrone(s,violinNextTime);
+ if(s.advanceStep===0)violinStartDrone(s,violinNextTime);
  const cueTimer=setTimeout(()=>{if(violinSettings===s){
   $('violinCurrent').textContent='Starting note: '+violinMidiName(notes[0]);
   $('violinNext').textContent='Listen, then count in…';
