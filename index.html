@@ -168,14 +168,14 @@ small {color:var(--muted);}
 <label><input type="checkbox" id="vocalCount" checked> One-measure count-in</label>
 </div><p id="vocalPattern"></p><p id="vocalStatus" role="status" aria-live="polite"></p><button id="vocalStart" onclick="startVocal()">Start</button> <button id="vocalStop" onclick="stopVocal()" disabled>Stop</button></section>
 <section id="violinPage" hidden>
-<h2>Violin — Guided Scale Practice (Major & Pentatonic)</h2>
+<h2>Violin — Guided Scale Practice</h2>
 <p><small>Play along with a reference melody and a steady tonic drone. No microphone required; use your ears to match pitch and tune against the drone.</small></p>
 <div class="options-panel" id="violinOptions">
 <label>Key: <select id="violinKey"></select></label>
 <label>Home tonic octave: <select id="violinOctave"><option value="3">3</option><option value="4" selected>4</option><option value="5">5</option></select></label>
 <label>Lowest note: <select id="violinLow"></select></label>
 <label>Highest note: <select id="violinHigh"></select></label><br>
-<label>Scale: <select id="violinScaleType"><option value="major">Major (7 notes)</option><option value="majorPent">Major pentatonic (1–2–3–5–6)</option><option value="minorPent">Minor pentatonic (1–♭3–4–5–♭7)</option></select></label><br>
+<label>Scale: <select id="violinScaleType"><optgroup label="Diatonic modes"><option value="major">Ionian (major)</option><option value="dorian">Dorian</option><option value="phrygian">Phrygian</option><option value="lydian">Lydian</option><option value="mixolydian">Mixolydian</option><option value="aeolian">Aeolian (natural minor)</option><option value="locrian">Locrian</option></optgroup><optgroup label="Other minor scales"><option value="harmonicMinor">Harmonic minor</option><option value="melodicMinor">Melodic minor (ascending form both ways)</option></optgroup><optgroup label="Pentatonic"><option value="majorPent">Major pentatonic (1–2–3–5–6)</option><option value="minorPent">Minor pentatonic (1–♭3–4–5–♭7)</option></optgroup></select></label><br>
 <label>Pattern: <select id="violinPattern"><option value="scale">Straight scale</option><option value="thirds">Diatonic thirds (Do–Mi–Re–Fa…)</option><option value="groups">Four-note groups (Do–Re–Mi–Do, Re–Mi–Fa–Re…)</option></select></label><br>
 <label>Tempo: <input id="violinTempo" type="number" min="30" max="240" value="70" style="width:80px"> BPM</label>
 <label>Meter: <select id="violinMeter"><option value="4">4/4</option><option value="3">3/4</option></select></label>
@@ -880,7 +880,7 @@ document.addEventListener('visibilitychange',()=>{if(document.hidden){stopCircle
 // Violin practice: independent AudioContext-clock transport, shared oscillator engine.
 const violinKeys=[['C',0],['C♯ / D♭',1],['D',2],['E♭',3],['E',4],['F',5],['F♯',6],['G',7],['A♭',8],['A',9],['B♭',10],['B',11]];
 const violinScaleSteps=[0,2,4,5,7,9,11];
-const violinScaleTypes={major:violinScaleSteps,majorPent:[0,2,4,7,9],minorPent:[0,3,5,7,10]};
+const violinScaleTypes={major:violinScaleSteps,dorian:[0,2,3,5,7,9,10],phrygian:[0,1,3,5,7,8,10],lydian:[0,2,4,6,7,9,11],mixolydian:[0,2,4,5,7,9,10],aeolian:[0,2,3,5,7,8,10],locrian:[0,1,3,5,6,8,10],harmonicMinor:[0,2,3,5,7,8,11],melodicMinor:[0,2,3,5,7,9,11],majorPent:[0,2,4,7,9],minorPent:[0,3,5,7,10]};
 let violinTimer=null,violinSettings=null,violinNextTime=0,violinSlot=0,violinTimers=[];
 violinKeys.forEach(([name,pc])=>{const o=document.createElement('option');o.value=pc;o.textContent=name;$('violinKey').appendChild(o);});
 $('violinKey').value='7'; // G major.
