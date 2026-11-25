@@ -941,7 +941,7 @@ function violinPatternPath(path,pattern){
   else if(pattern==='groups')result.push(path[i],path[i+1],path[i+2],path[i]);
  }
  // End each run at its actual endpoint so transitions remain clearly audible.
- if(path.length&&result.at(-1)!==path.at(-1))result.push(path.at(-1));
+ // Patterned routes contain only complete rhythmic motifs.
  return result;
 }
 function violinRoute(scale,home,direction,pattern,descendingScale=scale){
@@ -957,9 +957,13 @@ function violinRoute(scale,home,direction,pattern,descendingScale=scale){
    const descent=reverseFrom(up.at(-1));
    const bottom=descent.at(-1);
    const back=[bottom,...scale.filter(n=>n>bottom&&n<=home)];
-   return path(up).concat(path(descent),path(back).slice(1));
+   return path(up).concat(path(descent),(pattern==='scale'?path(back).slice(1):path(back)));
   }
   return path(scale).concat(path(reverseFrom(scale.at(-1))));
+ }
+ if(pattern!=='scale'&&direction==='home'){
+  if(!scale.includes(home))return [];
+  return [scale.filter(n=>n>=home),[...scale].reverse(),scale.filter(n=>n<=home)].flatMap(leg=>violinPatternPath(leg,pattern));
  }
  const homeIndex=scale.indexOf(home);
  if(direction==='home'){
